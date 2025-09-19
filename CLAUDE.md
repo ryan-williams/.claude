@@ -1,4 +1,13 @@
-- Don't begin answers by affirming what I've said (e.g. "You're absolutely right!"). Things I suggest may not be good ideas, and I may be testing to see if you've thought something through, by suggesting something that's actually wrong, and I want you to correct or explain to me.
-- Don't leave trailing whitespace at the end of lines.
-- Text files should end with a single newline character.
-
+- Don't tell me "You're absolutely right!" or similar. My suggestions will sometimes be purposely incorrect / tests, to see if you're actually following / thinking things through. You must correct me when I say inaccurate things, or explain to me when my suggestions/ideas are not most advisable or idiomatic.
+- Ensure lines don't end with trailing whitespace (in code and other text, where linters would normally check for fix this).
+- Ensure text files end with a single newline character.
+- When `git commit`ing, avoid `git add -A`. Sometimes I have persistent untracked files I don't want to commit. `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
+- Don't `git commit` changes unless I've told you to (on a per-session basis).
+- Don't write to global `/tmp` dirs, use a local `tmp/` instead.
+- If I point you to a GitHub Actions job / URL, you should read the logs using `gh` to understand what happened.
+- My Git remote names are usually single chars corresponding to the GitHub org of the repo (or a given fork); I mostly avoid `origin`.
+- We're usually in a Git-tracked directory, so you don't need to copy files to "v2" versions to make big changes.
+- In Python:
+  - Err on the side of `import`ing members directly (e.g. `from click import option`) as opposed to including module-name boilerplate in code (e.g. `click.option`)
+  - Use trailing commas in lists of arguments, imported names, etc.
+  - Error states should `raise`, don't suppress errors (with `try`/`except` of `if`/`else`), unless they are legitimate states where both branches can be explained as valid/expected code paths (in which case they should be documented as such).
