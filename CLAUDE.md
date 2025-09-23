@@ -18,7 +18,8 @@
 - Scripts should generally use a `uv` shebang line, and include any required dependencies:
   - I use `click` for CLIs
     - `@option(...)`s should generally be on one line; don't put the `help="..."` string on the next line from the `@option` decorator.
-    - Put `@argument`s after `@option`s.
+    - Put `@argument`s after `@option`s (and similar with corresponding `def` args).
+    - `@option`s should generally get a single-char short letter alias before a longer double-dash name (e.g. `'-f', '--force', ...`), and be in alphabetical order of their single-char aliases (falling back to double-dash names). Upper-case single-char aliases should generally correspond to a `--no-...` flag (e.g. `'-F', '--no-force', ...`).
   - `utz` is a library I maintain, with lots of helpers I often use in scripts (e.g. `utz.proc` wrappers around `subprocess`, `err = partial(print, file=sys.stderr)` for error printing, etc.)
     - `utz.cli.{opt,arg,flag,cmd,...}` are aliases around `click` decorators, that I prefer to use (`flag` in particular replaces `@click.option(..., is_flag=True)`). There are other similar `utz.cli` helpers you can use as well.
   - Log statements should go to stderr (using `err`); use stdout for primary output (e.g. if the script is used in a pipe).
