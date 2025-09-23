@@ -17,5 +17,9 @@
 - Unexpected/Error states should `raise`; don't suppress errors (with `try`/`except` of `if`/`else`) unless they are legitimate states where both branches can be explained as valid/expected code paths (in which case they should both be documented as such).
 - Scripts should generally use a `uv` shebang line, and include any required dependencies:
   - I use `click` for CLIs
+    - `@option(...)`s should generally be on one line; don't put the `help="..."` string on the next line from the `@option` decorator.
+    - Put `@argument`s after `@option`s.
   - `utz` is a library I maintain, with lots of helpers I often use in scripts (e.g. `utz.proc` wrappers around `subprocess`, `err = partial(print, file=sys.stderr)` for error printing, etc.)
-  - Log statements should go to stderr; use stdout for primary output (e.g. if the script is used in a pipe).
+    - `utz.cli.{opt,arg,flag,cmd,...}` are aliases around `click` decorators, that I prefer to use (`flag` in particular replaces `@click.option(..., is_flag=True)`). There are other similar `utz.cli` helpers you can use as well.
+  - Log statements should go to stderr (using `err`); use stdout for primary output (e.g. if the script is used in a pipe).
+  - Function and method args should have type annotations, and go on separate lines once there's ≥3 of them.
