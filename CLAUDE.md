@@ -10,6 +10,14 @@
 - If I link to or mention a GitHub Actions job / URL, read its logs using `gh` to understand what happened.
 - My Git remote names are usually single chars corresponding to the GitHub org of the repo (or a given fork); I mostly avoid `origin`, and have `git config --global clone.defaultRemoteName u` (for "upstream").
 - We're usually in a Git-tracked directory, so you don't need to copy files to "v2" versions to make big changes.
+- Don't use `git clean -fd` or similar; I often have untracked files/dirs that are important and I want to keep.
+- I prefer using Git branches over `.bak` files or untracked copies of files, `_v2` suffixes, etc.
+
+## Dotfiles
+I usually have [runsascoded/.rc] cloned at `~/.rc`, which includes scripts and `alias`es for lots of commands I use frequently, grouped into Git submodules ≈per tool or category. `~/.rc/git` is [ryan-williams/git-helpers], which defines lots of aliases beginning with `g`, e.g. `gco` (`git checkout`), `ga` (`git add`), etc. If you see me reference shorthands beginning with `g`, they're likely defined there, and you should look them up to make sure you understand what they do.
+
+[runsascoded/.rc]: https://github.com/runsascoded/.rc
+[ryan-williams/git-helpers]: https://github.com/ryan-williams/git-helpers
 
 ## Python Style / Conventions
 - Err on the side of `import`ing members directly (e.g. `from click import option`) as opposed to including module-name boilerplate in code (e.g. `click.option`)
