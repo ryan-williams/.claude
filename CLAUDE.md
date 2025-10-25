@@ -1,17 +1,19 @@
 ## General Claude Instructions
-- Don't tell me "You're absolutely right!" or similar. My suggestions will sometimes be purposely incorrect, to see if you're actually following / thinking things through. You **must** correct me when I say inaccurate things, and call out when my suggestions/ideas are not most advisable or idiomatic.
+- Don't say "You're absolutely right!" or similar. My suggestions will sometimes be purposely incorrect, to see if you're actually following / thinking things through. You **must** correct me when I say inaccurate things, and call out when my suggestions/ideas are not most advisable or idiomatic.
 - Ensure lines don't end with trailing whitespace (in code and other text, where linters would normally check for fix this).
 - Ensure text files end with a single newline character.
+- Don't leave "tombstone" comments about things you remove.
 
 ## Git Usage Conventions
-- Avoid `git add -A`. I often have persistent untracked files I don't want to commit. `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
+- Avoid `git add -A`. I often have persistent untracked files I don't want to commit.
+  - `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
+  - Similarly, don't use `git clean -fd` or similar; I often have untracked files/dirs that are important and I want to keep.
 - Don't `git commit` changes unless I've told you to (on a per-session basis).
 - Don't write to global `/tmp` dirs, use local `tmp/...` folders instead.
-- If I link to or mention a GitHub Actions job / URL, read its logs using `gh` to understand what happened.
-- My Git remote names are usually single chars corresponding to the GitHub org of the repo (or a given fork); I mostly avoid `origin`, and have `git config --global clone.defaultRemoteName u` (for "upstream").
-- We're usually in a Git-tracked directory, so you don't need to copy files to "v2" versions to make big changes.
-- Don't use `git clean -fd` or similar; I often have untracked files/dirs that are important and I want to keep.
-- I prefer using Git branches over `.bak` files or untracked copies of files, `_v2` suffixes, etc.
+- If I link to or mention a GitHub Actions job / URL, read its logs (using `gh run view --log` to understand what happened).
+- My Git remote names are usually single chars corresponding to the GitHub org of the repo (or a given fork); I avoid `origin`, and have `git config --global clone.defaultRemoteName u` (for "upstream").
+- You're usually in a Git-tracked directory, so you don't need to copy files to "v2" or "bak" versions when making big changes.
+  - Use Git branches instead of `.bak` files or untracked copies of files, `_v2` suffixes, etc.
 
 ## Dotfiles
 I usually have [runsascoded/.rc] cloned at `~/.rc`, which includes scripts and `alias`es for lots of commands I use frequently, grouped into Git submodules ≈per tool or category. `~/.rc/git` is [ryan-williams/git-helpers], which defines lots of aliases beginning with `g`, e.g. `gco` (`git checkout`), `ga` (`git add`), etc. If you see me reference shorthands beginning with `g`, they're likely defined there, and you should look them up to make sure you understand what they do.
@@ -32,3 +34,6 @@ I usually have [runsascoded/.rc] cloned at `~/.rc`, which includes scripts and `
     - `utz.cli.{opt,arg,flag,cmd,...}` are aliases around `click` decorators, that I prefer to use (`flag` in particular replaces `@click.option(..., is_flag=True)`). There are other similar `utz.cli` helpers you can use as well.
   - Log statements should go to stderr (using `err`); use stdout for primary output (e.g. if the script is used in a pipe).
   - Function and method args should have type annotations, and go on separate lines once there's ≥3 of them.
+
+## Markdown
+- I prefer defining links' hrefs in the "footer", so that the inline link only requires writing e.g. `[anchor text]` or `[text][shorthand name]`.
