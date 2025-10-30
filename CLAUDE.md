@@ -3,6 +3,7 @@
 - Ensure lines don't end with trailing whitespace (in code and other text, where linters would normally check for fix this).
 - Ensure text files end with a single newline character.
 - Don't leave "tombstone" comments about things you remove.
+- Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
 
 ## Git Usage Conventions
 - **Avoid `git add -A`**: I often have persistent untracked files and directories I don't want to commit. `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
@@ -10,9 +11,14 @@
 - Don't `git commit` changes unless I've told you to (on a per-session basis).
 - Don't write to global `/tmp` dirs, use local `tmp/...` subdirs instead.
 - If I link to or mention a GitHub Actions job / URL, read its logs (using `gh run view --log`) to understand what happened.
+  - Save the logs to a local file, then read from there (so you don't have to fetch them more than once).
 - My Git remote names are usually single chars corresponding to the GitHub org of the repo (or a given fork); I avoid `origin`, and have `git config --global clone.defaultRemoteName u` (for "upstream").
 - You're usually in a Git-tracked directory, so you don't need to copy files to "_v2", ".bak", or "_copy" versions when making big changes.
   - Use Git branches instead of `.bak` files or untracked copies of files, `_v2` suffixes, etc.
+- **User branches**: I use `gpu` (`git push-user-branch`) to push local branches to remote user namespaces
+  - Example: `gpu` on local branch `feat` pushes to `u/rw/feat` (where `rw` is from `GIT_USER_BRANCH_PREFIX`)
+  - Variants: `gpuf` (force), `gpun` (dry-run)
+  - The script auto-detects the tracking remote or uses `-r <remote>` flag
 
 ## Dotfiles
 - [runsascoded/.rc] is cloned at `~/.rc`, containing scripts and `alias`es I use frequently, grouped into Git submodules ≈per tool or category.
@@ -21,6 +27,51 @@
 
 [runsascoded/.rc]: https://github.com/runsascoded/.rc
 [ryan-williams/git-helpers]: https://github.com/ryan-williams/git-helpers
+
+## Python Environment Management
+I use a multi-version venv system with `uv` and `direnv`, managed by `spd` and related commands from `~/.rc/py/`:
+
+### Directory Structure
+```
+.venv/
+  3.11.13/      # Actual venv for Python 3.11.13
+  3.12.11/      # Actual venv for Python 3.12.11
+  3.13.7/       # Actual venv for Python 3.13.7
+  bin -> 3.13.7/bin         # Symlink to active version
+  lib -> 3.13.7/lib
+  include -> 3.13.7/include
+  pyvenv.cfg -> 3.13.7/pyvenv.cfg
+  current       # File containing "3.13.7"
+  .lock         # Lock file
+```
+
+### Key Commands
+- **`spd`** (`py_direnv_init`): Setup/repair Python project with direnv
+  - Creates `.envrc` that sources `py-direnv-rc.sh`
+  - Converts old-style flat `.venv/` to versioned structure
+  - Auto-repairs existing `.envrc` files missing venv management
+  - Runs `uv sync` for projects with `uv.lock`
+  - Idempotent: safe to run multiple times
+- **`vl`**: List available venvs (shows versions + active marker)
+- **`vsw 3.12`** / **`vw 3.12`**: Switch to Python 3.12.x venv
+- **`vc 3.11 3.12 3.13`**: Create venvs for specific Python versions
+- **`pip`**: In UV projects, this is a wrapper around `uv pip`
+
+### UV Integration
+- `UV_PROJECT_ENVIRONMENT` and `VIRTUAL_ENV` are both set to `.venv` (the symlink)
+- UV follows the symlink to the actual versioned venv
+- `uv sync` installs into the active venv
+- Use `uv sync --extra <name>` (or `uvse <name>`) to install optional dependency groups
+
+### Common Workflow
+```bash
+cd my-project
+spd              # Setup project (creates .envrc, .venv structure)
+# direnv auto-activates on cd
+vl               # List available Python versions
+vsw 3.12         # Switch to Python 3.12 if needed
+uv sync          # Sync dependencies
+```
 
 ## Python Style / Conventions
 - `import` members directly (e.g. `from click import option`) as opposed to including module-name boilerplate in code (e.g. `click.option`)
