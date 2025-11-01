@@ -63,6 +63,12 @@ I use a multi-version venv system with `uv` and `direnv`, managed by `spd` and r
 - `uv sync` installs into the active venv
 - Use `uv sync --extra <name>` (or `uvse <name>`) to install optional dependency groups
 
+### Invoking Python Tools
+Since `direnv` activates the venv automatically, installed tools are directly available on `PATH`:
+- Use `python`, `pip`, `pytest`, etc. directly (NOT `uv run python`, `uv run pytest`)
+- `pip` is a wrapper around `uv pip` in UV projects
+- Only use `uv run` for ad-hoc scripts with inline dependencies
+
 ### Common Workflow
 ```bash
 cd my-project
