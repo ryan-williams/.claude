@@ -19,6 +19,7 @@
   - Example: `gpu` on local branch `feat` pushes to `u/rw/feat` (where `rw` is from `GIT_USER_BRANCH_PREFIX`)
   - Variants: `gpuf` (force), `gpun` (dry-run)
   - The script auto-detects the tracking remote or uses `-r <remote>` flag
+- **Commit messages**: Use backticks around code symbols (functions, variables, file names, commands, etc.) in commit messages. GitHub renders these in PR/issue titles and bodies, making it clear what refers to code.
 
 ## Dotfiles
 - [runsascoded/.rc] is cloned at `~/.rc`, containing scripts and `alias`es I use frequently, grouped into Git submodules ≈per tool or category.
