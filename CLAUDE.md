@@ -81,6 +81,7 @@ uv sync          # Sync dependencies
 ```
 
 ## Python Style / Conventions
+- **Invoking scripts**: I have `.` on `$PATH` and Python scripts are typically executable (`+x`), so invoke them directly by name (not `./script.py` or `python script.py`). Use `which` to find them if needed.
 - `import` members directly (e.g. `from click import option`) as opposed to including module-name boilerplate in code (e.g. `click.option`)
 - Use trailing commas in argument lists, multi-line imports, etc.
 - Unexpected/Error states should `raise`; don't suppress errors (with `try`/`except` or `if`/`else`) unless they're legitimate states, where both branches can be explained as valid/expected code paths (in which case they should both be documented as such).
