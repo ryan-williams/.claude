@@ -98,5 +98,8 @@ uv sync          # Sync dependencies
   - Log statements should go to stderr (using `err`); use stdout for primary / pipe-able / parse-able output.
   - Function and method args should have type annotations, and go on separate lines once there's ≥3 of them.
 
+## JavaScript / Node.js
+- Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
+
 ## Markdown
 - Define links' hrefs in the "footer", so that the inline link only requires writing e.g. `[anchor text]` or `[long anchor text][short name]`.
