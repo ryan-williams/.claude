@@ -5,6 +5,16 @@
 - Don't leave "tombstone" comments about things you remove.
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
 
+## Acronyms / Shorthands
+I use these acronyms and abbreviations:
+- **WT**: Git worktree
+- **UCs**: Uncommitted Changes (staged and unstaged)
+- **SCs**: Staged Changes (Git index)
+- **USCs**: UnStaged Changes
+- **UFs**: Untracked Files (Git)
+
+I also use single-capital letter abbreviations ad hoc when it should be clear from context what noun (proper or otherwise) I mean.
+
 ## Git Usage Conventions
 - **Avoid `git add -A`**: I often have persistent untracked files and directories I don't want to commit. `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
 - Similarly, **don't use `git clean -fd`** or similar; I often have untracked files/dirs that are important and I want to keep.
