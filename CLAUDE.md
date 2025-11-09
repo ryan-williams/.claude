@@ -95,11 +95,12 @@ uv sync          # Sync dependencies
 - `import` members directly (e.g. `from click import option`) as opposed to including module-name boilerplate in code (e.g. `click.option`)
 - Use trailing commas in argument lists, multi-line imports, etc.
 - Unexpected/Error states should `raise`; don't suppress errors (with `try`/`except` or `if`/`else`) unless they're legitimate states, where both branches can be explained as valid/expected code paths (in which case they should both be documented as such).
-- **Testing**: Don't use substring assertions like `assert expected_substring in actual_string`. Use precise matching instead:
-  - Exact string equality
+- **Testing**: Don't use vague membership assertions like `assert expected_substring in actual_string` or `assert elem in array`. Use precise matching instead:
+  - Exact string/array equality
   - Match arrays of string lines
   - Robust regex matching
-  - Other specific assertions
+  - Specific element-by-element assertions
+  - Other precise assertions that clearly document expected values
 - Scripts should use a `uv run` shebang line, and include any required dependencies:
   - Use `click` for CLIs:
     - Each `@option(...)` and `@argument(...)` should be on one line; don't put the `help="..."` string on a separate line from the decorator.
