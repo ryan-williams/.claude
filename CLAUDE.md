@@ -4,6 +4,7 @@
 - Ensure text files end with a single newline character.
 - Don't leave "tombstone" comments about things you remove.
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
+- I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations:
@@ -12,6 +13,7 @@ I use these acronyms and abbreviations:
 - **SCs**: Staged Changes (Git index)
 - **USCs**: UnStaged Changes
 - **UFs**: Untracked Files (Git)
+- **TP** / **FP** / **TN** / **FN**: True Positive / False Positive / True Negative / False Negative
 
 I also use single-capital letter abbreviations ad hoc when it should be clear from context what noun (proper or otherwise) I mean.
 
@@ -31,10 +33,14 @@ I also use single-capital letter abbreviations ad hoc when it should be clear fr
   - The script auto-detects the tracking remote or uses `-r <remote>` flag
 - **Commit messages**: Use backticks around code symbols (functions, variables, file names, commands, etc.) in commit messages. GitHub renders these in PR/issue titles and bodies, making it clear what refers to code.
 
-## Dotfiles
-- [runsascoded/.rc] is cloned at `~/.rc`, containing scripts and `alias`es I use frequently, grouped into Git submodules ≈per tool or category.
-- `~/.rc/git` is [ryan-williams/git-helpers], which defines lots of aliases beginning with `g`, e.g. `gco` (`git checkout`), `ga` (`git add`), etc.
-  - If I reference cmds beginning with `g`, it's likely defined there; look them up to understand what they do.
+## Dotfiles / Bash
+- [runsascoded/.rc] is cloned at `~/.rc`, containing scripts and `alias`es I use frequently, grouped into Git submodules ≈per tool or category, e.g.:
+  - `~/.rc/git` is [ryan-williams/git-helpers], which defines lots of aliases beginning with `g`, e.g. `gco` (`git checkout`), `ga` (`git add`), etc.
+    - If I reference cmds beginning with `g`, it's likely defined there; look them up to understand what they do.
+  - `~/.rc/parquet` contains useful scripts, many are wrappers around https://github.com/jupiter/parquet2json: `pqc` ("cat"), `pqn` (num rows), `pqs` (schema), `pqa` ("all": includes MD5, schema, num rows, and 3 head and tail rows), `pqm` (metadata), etc.
+  - `~/.rc/py` contains helpers for Python (including venv and `uv` mgmt, see below)
+- On my laptop, `$c` points at `~/c`: a root dir where I clone most source code repos.
+  - On EC2 nodes I usually just clone a few repos relevant to a specific project directly under `~/`.
 
 [runsascoded/.rc]: https://github.com/runsascoded/.rc
 [ryan-williams/git-helpers]: https://github.com/ryan-williams/git-helpers
@@ -116,6 +122,40 @@ uv sync          # Sync dependencies
 
 ## JavaScript / Node.js
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
+- I ≈always want MUI Tooltips, not browser natives. Latter take too long to appear and are too small and flat/unstyleable/non-rich.
+
+### Frequently Used JS/TS Tools and Libraries
+`$js` (`~/c/js`) is a root dir for JS/TS projects I maintain, most of which live at https://gitlab.com/runsascoded/js.
+
+Several tools I often use while developing other applications and libraries:
+
+- `npm-dist` (https://github.com/runsascoded/npm-dist / https://gitlab.com/runsascoded/js/npm-dist): Git{Hu,La}b Action to build and publish "dist" branches for npm packages, which can be directly added (by SHA or branch name, but I always prefer SHA) in downstream `package.json`s (or via `pds gh <name>`, per below).
+- [`pnpm-dep-source`] (a.k.a. `pds`; https://github.com/runsascoded/pnpm-dep-source): manage dependencies that I may be developing locally in tandem with local projects that use them:
+  - `pds init <path>`: declare `<path>` as a `pds`-managed dependency in a given project
+  - `pds [l|local] <name>`: point current project at local build of `<name>`
+    - Note: `<name>` can be any unique substring match, here and in other cmds below
+    - Manages settings in 2-3 places, including `pnpm-workspace.yaml`, that are necessary for "hot-reloading" of local dependencies to work.
+  - `pds [gh|gl] <name>`: point at a recent Git{Hu,La}b "dist"-branch build
+  - `pds [n|npm] <name> [version]`: point at latest published npm version
+- [`scrns`] (https://gitlab.com/runsascoded/js/scrns): screenshot automation tool, frequently used for preview images in `README.md`s, `og:image`s, etc.
+
+[`pnpm-dep-source`]: https://www.npmjs.com/package/pnpm-dep-source
+[`scrns`]: https://www.npmjs.com/package/scrns
+
+And a few libraries I often use in JS/TS apps:
+- [`use-kbd`] (https://github.com/runsascoded/use-kbd): Omnibars, editable hotkeys, search, and keyboard-navigation for React apps.
+- [`@rdub/use-url-params`] (https://github.com/runsascoded/use-url-params): React hooks for managing URL query parameters with type-safe encoding/decoding
+- [`@rdub/base`] (https://gitlab.com/runsascoded/js/base): helpers and convenience imports arguably missing from stdlib (e.g. for Object, Array, Math, …; also some React)
+
+[`use-kbd`]: https://www.npmjs.com/package/use-kbd
+[`@rdub/use-url-params`]: https://www.npmjs.com/package/@rdub/use-url-params
+[`@rdub/base`]: https://www.npmjs.com/package/@rdub/base
 
 ## Markdown
 - Define links' hrefs in the "footer", so that the inline link only requires writing e.g. `[anchor text]` or `[long anchor text][short name]`.
+
+## Diffs
+`dffs` (https://github.com/runsascoded/dffs) should be `pipx install`'d and globally accessible (and also cloned at `~/c/dffs`), and exposes CLIs:
+- `diff-x` ("Diff two files after running them through a pipeline of other commands")
+- `git-diff-x` ("Diff files at two commits, or one commit and the current worktree, after applying an optional command pipeline")
+- `comm-x` ("Select or reject lines common to two input streams, after running each through a pipeline of other commands.")
