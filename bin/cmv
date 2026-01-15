@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Move a project directory and rename its Claude Code config accordingly
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: cmv <old-path> <new-path>"
+  echo "Moves a project directory and renames its ~/.claude/projects/ config"
+  exit 1
+}
+
+[[ $# -eq 2 ]] || usage
+
+old_path="$(cd "$1" && pwd)"
+new_path="$2"
+
+# Resolve new_path's parent to absolute, keep basename
+new_parent="$(cd "$(dirname "$new_path")" && pwd)"
+new_path="$new_parent/$(basename "$new_path")"
+
+# Encode path to Claude's project dir format: /foo/bar/.baz → -foo-bar-baz
+encode_path() {
+  local p="$1"
+  # Replace / with -, remove dots
+  echo "$p" | sed 's|/|-|g; s|\.||g'
+}
+
+old_encoded="$(encode_path "$old_path")"
+new_encoded="$(encode_path "$new_path")"
+
+claude_projects="$HOME/.claude/projects"
+old_config="$claude_projects/$old_encoded"
+new_config="$claude_projects/$new_encoded"
+
+# Check old path exists
+if [[ ! -d "$old_path" ]]; then
+  echo "Error: $old_path does not exist" >&2
+  exit 1
+fi
+
+# Check new path doesn't exist
+if [[ -e "$new_path" ]]; then
+  echo "Error: $new_path already exists" >&2
+  exit 1
+fi
+
+# Move the project directory
+echo "Moving project: $old_path → $new_path"
+mv "$old_path" "$new_path"
+
+# Move Claude config if it exists
+if [[ -d "$old_config" ]]; then
+  if [[ -e "$new_config" ]]; then
+    echo "Warning: $new_config already exists, not moving Claude config" >&2
+  else
+    echo "Moving Claude config: $old_encoded → $new_encoded"
+    mv "$old_config" "$new_config"
+  fi
+else
+  echo "No Claude config found at $old_config"
+fi
+
+echo "Done"
