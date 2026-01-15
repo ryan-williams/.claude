@@ -40,6 +40,13 @@ if [[ ! -d "$old_path" ]]; then
   exit 1
 fi
 
+# Check if Claude is running in the old project
+if pgrep -f "claude.*$old_path" >/dev/null 2>&1; then
+  echo "Error: Claude appears to be running in $old_path" >&2
+  echo "Exit that session first, then retry." >&2
+  exit 1
+fi
+
 # Check new path doesn't exist
 if [[ -e "$new_path" ]]; then
   echo "Error: $new_path already exists" >&2
