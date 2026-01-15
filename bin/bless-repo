@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Add read-only git permissions for a repo to current project's Claude settings
+
+set -euo pipefail
+
+repo="${1:?Usage: bless-repo /path/to/repo}"
+repo="$(cd "$repo" && pwd)"  # Resolve to absolute path
+
+settings=".claude/settings.local.json"
+
+# Read-only git commands to bless
+cmds=(branch check-ignore diff fetch log ls-files ls-tree reflog remote show status)
+
+# Create settings file if needed
+if [[ ! -f "$settings" ]]; then
+  mkdir -p .claude
+  echo '{}' > "$settings"
+fi
+
+# Get existing permissions
+existing=$(jq -r '.permissions.allow // [] | .[]' "$settings" 2>/dev/null || echo "")
+
+# Build list of new permissions (skip existing)
+new_perms=()
+skipped=()
+for cmd in "${cmds[@]}"; do
+  perm="Bash(git -C $repo $cmd:*)"
+  if echo "$existing" | grep -qxF "$perm"; then
+    skipped+=("$cmd")
+  else
+    new_perms+=("$perm")
+  fi
+done
+
+if [[ ${#new_perms[@]} -eq 0 ]]; then
+  echo "All ${#cmds[@]} git commands already permitted for $repo"
+  exit 0
+fi
+
+# Add new permissions using jq
+jq --argjson new "$(printf '%s\n' "${new_perms[@]}" | jq -R . | jq -s .)" '
+  .permissions.allow = ((.permissions.allow // []) + $new)
+' "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
+
+echo "Added ${#new_perms[@]} git permissions for $repo"
+if [[ ${#skipped[@]} -gt 0 ]]; then
+  echo "Skipped ${#skipped[@]} (already present): ${skipped[*]}"
+fi
+echo "Restart Claude to apply: claude -c"
