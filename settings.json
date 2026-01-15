@@ -11,6 +11,7 @@
       "Bash(hexdump:*)",
       "Bash(head:*)",
       "Bash(jq:*)",
+      "Bash(ln -s:*)",
       "Bash(ls:*)",
       "Bash(lsof:*)",
       "Bash(pgrep:*)",
