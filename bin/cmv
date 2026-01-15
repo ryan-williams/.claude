@@ -6,6 +6,7 @@ set -euo pipefail
 usage() {
   echo "Usage: cmv <old-path> <new-path>"
   echo "Moves a project directory and renames its ~/.claude/projects/ config"
+  echo "and updates ~/.claude.json project entries"
   exit 1
 }
 
@@ -29,6 +30,7 @@ old_encoded="$(encode_path "$old_path")"
 new_encoded="$(encode_path "$new_path")"
 
 claude_projects="$HOME/.claude/projects"
+claude_json="$HOME/.claude.json"
 old_config="$claude_projects/$old_encoded"
 new_config="$claude_projects/$new_encoded"
 
@@ -48,7 +50,7 @@ fi
 echo "Moving project: $old_path → $new_path"
 mv "$old_path" "$new_path"
 
-# Move Claude config if it exists
+# Move Claude projects/ config if it exists
 if [[ -d "$old_config" ]]; then
   if [[ -e "$new_config" ]]; then
     echo "Warning: $new_config already exists, not moving Claude config" >&2
@@ -58,6 +60,17 @@ if [[ -d "$old_config" ]]; then
   fi
 else
   echo "No Claude config found at $old_config"
+fi
+
+# Update ~/.claude.json if it has an entry for the old path
+if [[ -f "$claude_json" ]]; then
+  if jq -e ".projects[\"$old_path\"]" "$claude_json" >/dev/null 2>&1; then
+    echo "Updating ~/.claude.json: $old_path → $new_path"
+    jq ".projects[\"$new_path\"] = .projects[\"$old_path\"] | del(.projects[\"$old_path\"])" \
+      "$claude_json" > "$claude_json.tmp" && mv "$claude_json.tmp" "$claude_json"
+  else
+    echo "No ~/.claude.json entry for $old_path"
+  fi
 fi
 
 echo "Done"
