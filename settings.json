@@ -1,0 +1,62 @@
+{
+  "alwaysThinkingEnabled": true,
+  "feedbackSurveyState": {
+    "lastShownTime": 1754000331023
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(file:*)",
+      "Bash(grep:*)",
+      "Bash(hexdump:*)",
+      "Bash(head:*)",
+      "Bash(jq:*)",
+      "Bash(ls:*)",
+      "Bash(lsof:*)",
+      "Bash(pgrep:*)",
+      "Bash(ps:*)",
+      "Bash(readlink:*)",
+      "Bash(stat:*)",
+      "Bash(tail:*)",
+      "Bash(tree:*)",
+      "Bash(wc:*)",
+      "Bash(which:*)",
+      "Bash(xxd:*)",
+
+      "Bash(git branch:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git reflog:*)",
+      "Bash(git remote:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
+
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh release view:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run watch:*)",
+
+      "Bash(npm view:*)",
+      "Bash(pip index:*)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(pipx list:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pytest:*)",
+      "Bash(uv tree:*)"
+    ]
+  }
+}
