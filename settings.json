@@ -59,7 +59,10 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm test:*)",
       "Bash(pytest:*)",
-      "Bash(uv tree:*)"
+      "Bash(uv tree:*)",
+
+      "WebFetch",
+      "WebSearch"
     ]
   }
 }
