@@ -6,6 +6,7 @@
   "permissions": {
     "allow": [
       "Bash(cat:*)",
+      "Bash(chmod:*)",
       "Bash(du:*)",
       "Bash(file:*)",
       "Bash(grep:*)",
