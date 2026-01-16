@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Clean up .claude/settings.local.json by removing junk permissions
+#
+# Removes:
+# - Entries with newlines (broken commit messages)
+# - Entries containing EOF, HEREDOC markers
+# - Entries that are shell fragments (do, done, then, fi)
+# - Very long one-off commands (>100 chars without :*)
+#
+# Keeps:
+# - Patterns ending in :*)
+# - Simple tool permissions (WebFetch, WebSearch, etc.)
+# - Short specific commands (<100 chars, no newlines)
+
+set -euo pipefail
+
+settings="${1:-.claude/settings.local.json}"
+
+if [[ ! -f "$settings" ]]; then
+  echo "Error: $settings not found" >&2
+  exit 1
+fi
+
+# Validate JSON first
+if ! jq empty "$settings" 2>/dev/null; then
+  echo "Error: $settings is not valid JSON" >&2
+  echo "Attempting to identify the issue..."
+  jq . "$settings" 2>&1 | head -5
+  exit 1
+fi
+
+# Count before
+before=$(jq '.permissions.allow | length' "$settings")
+
+# Filter permissions
+jq '
+  .permissions.allow = (
+    .permissions.allow // [] | map(
+      select(
+        # Must not contain newlines
+        (contains("\n") | not) and
+        # Must not contain EOF/HEREDOC markers
+        (contains("EOF") | not) and
+        (contains("<<") | not) and
+        # Must not be shell fragments
+        (. != "Bash(do)") and
+        (. != "Bash(done)") and
+        (. != "Bash(then)") and
+        (. != "Bash(fi)") and
+        (. != "Bash(else)") and
+        # Must not start with for/if/while without :*
+        ((startswith("Bash(for ") and endswith(":*)")) or (startswith("Bash(for ") | not)) and
+        ((startswith("Bash(if ") and endswith(":*)")) or (startswith("Bash(if ") | not)) and
+        ((startswith("Bash(while ") and endswith(":*)")) or (startswith("Bash(while ") | not)) and
+        (
+          # Keep patterns ending in :*)
+          endswith(":*)") or
+          # Keep non-Bash permissions (WebFetch, WebSearch, Read, Edit, etc.)
+          (startswith("Bash(") | not) or
+          # Keep short Bash commands (likely intentional)
+          length < 100
+        )
+      )
+    ) | unique | sort
+  )
+' "$settings" > "$settings.tmp"
+
+# Count after
+after=$(jq '.permissions.allow | length' "$settings.tmp")
+
+removed=$((before - after))
+
+if [[ $removed -eq 0 ]]; then
+  echo "No changes needed ($before permissions)"
+  rm "$settings.tmp"
+else
+  mv "$settings.tmp" "$settings"
+  echo "Cleaned $settings: $before → $after permissions ($removed removed)"
+fi
