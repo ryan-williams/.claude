@@ -12,17 +12,18 @@
 # - Simple tool permissions (WebFetch, WebSearch, etc.)
 # - Short specific commands (<100 chars, no newlines)
 #
-# With --consolidate:
+# By default, also consolidates:
 # - Converts one-off git commands to patterns (e.g., `git log --oneline -5` → `git log:*`)
+# Use --no-consolidate / -C to skip consolidation
 
 set -euo pipefail
 
-consolidate=false
+consolidate=true
 settings=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -c|--consolidate) consolidate=true; shift ;;
+    -C|--no-consolidate) consolidate=false; shift ;;
     -*) echo "Unknown option: $1" >&2; exit 1 ;;
     *) settings="$1"; shift ;;
   esac
