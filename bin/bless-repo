@@ -9,7 +9,7 @@ repo="$(cd "$repo" && pwd)"  # Resolve to absolute path
 settings=".claude/settings.local.json"
 
 # Read-only git commands to bless
-cmds=(branch check-ignore diff fetch log ls-files ls-tree reflog remote show status)
+cmds=(branch cat-file check-ignore diff fetch log ls-files ls-tree reflog remote rev-list show status)
 
 # Create settings file if needed
 if [[ ! -f "$settings" ]]; then
