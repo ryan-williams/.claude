@@ -11,10 +11,24 @@
 # - Patterns ending in :*)
 # - Simple tool permissions (WebFetch, WebSearch, etc.)
 # - Short specific commands (<100 chars, no newlines)
+#
+# With --consolidate:
+# - Converts one-off git commands to patterns (e.g., `git log --oneline -5` → `git log:*`)
 
 set -euo pipefail
 
-settings="${1:-.claude/settings.local.json}"
+consolidate=false
+settings=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -c|--consolidate) consolidate=true; shift ;;
+    -*) echo "Unknown option: $1" >&2; exit 1 ;;
+    *) settings="$1"; shift ;;
+  esac
+done
+
+settings="${settings:-.claude/settings.local.json}"
 
 if [[ ! -f "$settings" ]]; then
   echo "Error: $settings not found" >&2
@@ -70,10 +84,53 @@ after=$(jq '.permissions.allow | length' "$settings.tmp")
 
 removed=$((before - after))
 
-if [[ $removed -eq 0 ]]; then
-  echo "No changes needed ($before permissions)"
-  rm "$settings.tmp"
-else
+if [[ $removed -gt 0 ]]; then
   mv "$settings.tmp" "$settings"
-  echo "Cleaned $settings: $before → $after permissions ($removed removed)"
+  echo "Cleaned: $before → $after permissions ($removed removed)"
+else
+  rm "$settings.tmp"
+  echo "No junk to remove ($before permissions)"
+fi
+
+# Consolidate one-off commands to patterns
+if [[ "$consolidate" == "true" ]]; then
+  before_consolidate=$(jq '.permissions.allow | length' "$settings")
+
+  # Convert specific git commands to patterns
+  # e.g., "Bash(git -C /path log --oneline -5)" → "Bash(git -C /path log:*)"
+  # e.g., "Bash(git status --short)" → "Bash(git status:*)"
+  jq '
+    # Git subcommands that can be consolidated
+    def git_cmds: ["add", "branch", "check-ignore", "checkout", "commit", "diff", "fetch", "log", "ls-files", "ls-tree", "merge-base", "push", "reflog", "remote", "reset", "restore", "show", "stash", "status", "tag"];
+
+    .permissions.allow = (
+      .permissions.allow | map(
+        # Handle "Bash(git -C /path cmd ...)" patterns
+        if test("^Bash\\(git -C [^ ]+ (\\w+)") and (endswith(":*)") | not) then
+          capture("^Bash\\(git -C (?<path>[^ ]+) (?<cmd>\\w+)") |
+          if .cmd | IN(git_cmds[]) then
+            "Bash(git -C \(.path) \(.cmd):*)"
+          else . end
+        # Handle "Bash(git cmd ...)" patterns (no -C)
+        elif test("^Bash\\(git (\\w+)") and (test("^Bash\\(git -") | not) and (endswith(":*)") | not) then
+          capture("^Bash\\(git (?<cmd>\\w+)") |
+          if .cmd | IN(git_cmds[]) then
+            "Bash(git \(.cmd):*)"
+          else . end
+        else .
+        end
+      ) | unique | sort
+    )
+  ' "$settings" > "$settings.tmp"
+
+  after_consolidate=$(jq '.permissions.allow | length' "$settings.tmp")
+  consolidated=$((before_consolidate - after_consolidate))
+
+  if [[ $consolidated -gt 0 ]]; then
+    mv "$settings.tmp" "$settings"
+    echo "Consolidated: $before_consolidate → $after_consolidate permissions ($consolidated merged)"
+  else
+    rm "$settings.tmp"
+    echo "No permissions to consolidate"
+  fi
 fi
