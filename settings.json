@@ -8,6 +8,7 @@
       "Bash(cat:*)",
       "Bash(chmod:*)",
       "Bash(du:*)",
+      "Bash(echo:*)",
       "Bash(file:*)",
       "Bash(grep:*)",
       "Bash(hexdump:*)",
