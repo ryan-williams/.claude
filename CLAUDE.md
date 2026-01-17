@@ -32,6 +32,7 @@ I also use single-capital letter abbreviations ad hoc when it should be clear fr
   - Variants: `gpuf` (force), `gpun` (dry-run)
   - The script auto-detects the tracking remote or uses `-r <remote>` flag
 - **Commit messages**: Use backticks around code symbols (functions, variables, file names, commands, etc.) in commit messages. GitHub renders these in PR/issue titles and bodies, making it clear what refers to code.
+- **Non-interactive rebase**: Use `g rni` (`git rebase-noninteractive`) to apply rebase plans from stdin without interactive editing. Useful for scripted rewording/reordering.
 
 ## Dotfiles / Bash
 - [runsascoded/.rc] is cloned at `~/.rc`, containing scripts and `alias`es I use frequently, grouped into Git submodules ≈per tool or category, e.g.:
