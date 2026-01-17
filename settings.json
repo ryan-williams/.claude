@@ -5,6 +5,15 @@
   },
   "permissions": {
     "allow": [
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo tree:*)",
+
       "Bash(cat:*)",
       "Bash(chmod:*)",
       "Bash(du:*)",
