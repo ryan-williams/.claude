@@ -78,6 +78,7 @@
       "Bash(pnpm run:*)",
       "Bash(pnpm start:*)",
       "Bash(pnpm test:*)",
+      "Bash(pnpm tsc:*)",
       "Bash(pnpm why:*)",
       "Bash(pytest:*)",
       "Bash(uv tree:*)",
