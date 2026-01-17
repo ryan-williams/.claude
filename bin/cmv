@@ -12,11 +12,21 @@ usage() {
 
 [[ $# -eq 2 ]] || usage
 
+# Check old path exists before trying to resolve
+if [[ ! -d "$1" ]]; then
+  echo "Error: $1 does not exist" >&2
+  exit 1
+fi
+
 old_path="$(cd "$1" && pwd)"
 new_path="$2"
 
 # Resolve new_path's parent to absolute, keep basename
-new_parent="$(cd "$(dirname "$new_path")" && pwd)"
+new_parent="$(cd "$(dirname "$new_path")" 2>/dev/null && pwd)"
+if [[ -z "$new_parent" ]]; then
+  echo "Error: parent directory of $new_path does not exist" >&2
+  exit 1
+fi
 new_path="$new_parent/$(basename "$new_path")"
 
 # Encode path to Claude's project dir format: /foo/bar/.baz → -foo-bar-baz
@@ -33,12 +43,6 @@ claude_projects="$HOME/.claude/projects"
 claude_json="$HOME/.claude.json"
 old_config="$claude_projects/$old_encoded"
 new_config="$claude_projects/$new_encoded"
-
-# Check old path exists
-if [[ ! -d "$old_path" ]]; then
-  echo "Error: $old_path does not exist" >&2
-  exit 1
-fi
 
 # Check if Claude is running in the old project
 if pgrep -f "claude.*$old_path" >/dev/null 2>&1; then
