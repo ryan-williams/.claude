@@ -7,34 +7,69 @@ usage() {
   echo "Usage: cmv <old-path> <new-path>"
   echo "Moves a project directory and renames its ~/.claude/projects/ config"
   echo "and updates ~/.claude.json project entries"
+  echo ""
+  echo "If old-path doesn't exist but new-path does, assumes mv was already done"
+  echo "and just updates Claude configs."
   exit 1
 }
 
 [[ $# -eq 2 ]] || usage
 
-# Check old path exists before trying to resolve
-if [[ ! -d "$1" ]]; then
-  echo "Error: $1 does not exist" >&2
-  exit 1
-fi
+raw_old="$1"
+raw_new="$2"
 
-old_path="$(cd "$1" && pwd)"
-new_path="$2"
+# Resolve a path to absolute (works for existing paths)
+resolve_path() {
+  (cd "$1" && pwd)
+}
 
-# Resolve new_path's parent to absolute, keep basename
-new_parent="$(cd "$(dirname "$new_path")" 2>/dev/null && pwd)"
-if [[ -z "$new_parent" ]]; then
-  echo "Error: parent directory of $new_path does not exist" >&2
-  exit 1
-fi
-new_path="$new_parent/$(basename "$new_path")"
+# Resolve a non-existent path by resolving parent + basename
+resolve_new_path() {
+  local p="$1"
+  local parent dir
+  parent="$(cd "$(dirname "$p")" 2>/dev/null && pwd)" || return 1
+  echo "$parent/$(basename "$p")"
+}
 
 # Encode path to Claude's project dir format: /foo/bar/.baz → -foo-bar-baz
 encode_path() {
-  local p="$1"
-  # Replace / with -, remove dots
-  echo "$p" | sed 's|/|-|g; s|\.||g'
+  echo "$1" | sed 's|/|-|g; s|\.||g'
 }
+
+# Determine state: did mv happen already?
+old_exists=false
+new_exists=false
+[[ -d "$raw_old" ]] && old_exists=true
+[[ -d "$raw_new" ]] && new_exists=true
+
+if $old_exists && $new_exists; then
+  echo "Error: Both $raw_old and $raw_new exist (ambiguous)" >&2
+  exit 1
+elif ! $old_exists && ! $new_exists; then
+  echo "Error: Neither $raw_old nor $raw_new exists" >&2
+  exit 1
+elif $old_exists; then
+  # Normal case: old exists, new doesn't
+  old_path="$(resolve_path "$raw_old")"
+  new_path="$(resolve_new_path "$raw_new")" || {
+    echo "Error: parent directory of $raw_new does not exist" >&2
+    exit 1
+  }
+  already_moved=false
+else
+  # Already moved: old doesn't exist, new does
+  new_path="$(resolve_path "$raw_new")"
+  # Infer old_path from raw_old (resolve relative to cwd or use as-is if absolute)
+  if [[ "$raw_old" = /* ]]; then
+    old_path="$raw_old"
+  else
+    old_path="$(pwd)/$raw_old"
+  fi
+  # Normalize (remove trailing slashes, ./ etc)
+  old_path="$(echo "$old_path" | sed 's|/\+|/|g; s|/$||')"
+  already_moved=true
+  echo "Note: $raw_old doesn't exist but $raw_new does; assuming mv already done"
+fi
 
 old_encoded="$(encode_path "$old_path")"
 new_encoded="$(encode_path "$new_path")"
@@ -44,22 +79,20 @@ claude_json="$HOME/.claude.json"
 old_config="$claude_projects/$old_encoded"
 new_config="$claude_projects/$new_encoded"
 
-# Check if Claude is running in the old project
-if pgrep -f "claude.*$old_path" >/dev/null 2>&1; then
-  echo "Error: Claude appears to be running in $old_path" >&2
-  echo "Exit that session first, then retry." >&2
-  exit 1
-fi
+# Check if Claude is running in the old or new project
+for check_path in "$old_path" "$new_path"; do
+  if pgrep -f "claude.*$check_path" >/dev/null 2>&1; then
+    echo "Error: Claude appears to be running in $check_path" >&2
+    echo "Exit that session first, then retry." >&2
+    exit 1
+  fi
+done
 
-# Check new path doesn't exist
-if [[ -e "$new_path" ]]; then
-  echo "Error: $new_path already exists" >&2
-  exit 1
+# Move the project directory (if not already done)
+if ! $already_moved; then
+  echo "Moving project: $old_path → $new_path"
+  mv "$old_path" "$new_path"
 fi
-
-# Move the project directory
-echo "Moving project: $old_path → $new_path"
-mv "$old_path" "$new_path"
 
 # Move Claude projects/ config if it exists
 if [[ -d "$old_config" ]]; then
