@@ -71,6 +71,7 @@
       "Bash(pnpm audit:*)",
       "Bash(pnpm build:*)",
       "Bash(pnpm dev:*)",
+      "Bash(pnpm exec tsc:*)",
       "Bash(pnpm install:*)",
       "Bash(pnpm lint:*)",
       "Bash(pnpm list:*)",
