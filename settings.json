@@ -67,6 +67,7 @@
 
       "Bash(npm search:*)",
       "Bash(npm view:*)",
+      "Bash(npx vitest:*)",
       "Bash(pip index:*)",
       "Bash(pip install:*)",
       "Bash(pip show:*)",
