@@ -64,6 +64,7 @@
       "Bash(gh run view:*)",
       "Bash(gh run watch:*)",
 
+      "Bash(npm search:*)",
       "Bash(npm view:*)",
       "Bash(pip index:*)",
       "Bash(pip install:*)",
@@ -79,6 +80,7 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm outdated:*)",
       "Bash(pnpm run:*)",
+      "Bash(pnpm search:*)",
       "Bash(pnpm start:*)",
       "Bash(pnpm test:*)",
       "Bash(pnpm tsc:*)",
