@@ -30,6 +30,7 @@
       "Bash(ls:*)",
       "Bash(lsof:*)",
       "Bash(pgrep:*)",
+      "Bash(printf:*)",
       "Bash(ps:*)",
       "Bash(readlink:*)",
       "Bash(stat:*)",
