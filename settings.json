@@ -21,6 +21,7 @@
       "Bash(curl http://localhost:*)",
       "Bash(du:*)",
       "Bash(echo:*)",
+      "Bash(env:*)",
       "Bash(file:*)",
       "Bash(grep:*)",
       "Bash(hexdump:*)",
