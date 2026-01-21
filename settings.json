@@ -37,6 +37,7 @@
       "Bash(readlink:*)",
       "Bash(stat:*)",
       "Bash(tail:*)",
+      "Bash(tee:*)",
       "Bash(test:*)",
       "Bash(tree:*)",
       "Bash([:*)",
