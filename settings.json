@@ -19,6 +19,7 @@
       "Bash(chmod:*)",
       "Bash(curl -s http://localhost:*)",
       "Bash(curl http://localhost:*)",
+      "Bash(dig:*)",
       "Bash(du:*)",
       "Bash(echo:*)",
       "Bash(env:*)",
