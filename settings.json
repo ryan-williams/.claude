@@ -5,6 +5,8 @@
   },
   "permissions": {
     "allow": [
+      "Bash(brew:*)",
+
       "Bash(cargo build:*)",
       "Bash(cargo check:*)",
       "Bash(cargo clippy:*)",
