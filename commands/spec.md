@@ -1,9 +1,21 @@
 Write a spec file for work to be done in another project.
 
+Usage: `/spec [project] [summary]`
+- `project`: Optional path, name, or identifiable token(s) for the target project
+- `summary`: Optional brief description of what the spec is about
+
+Examples:
+- `/spec` — infer project and topic from conversation context
+- `/spec client` — write spec for the "client" project
+- `/spec client "FE/BE split"` — spec about FE/BE split for client project
+- `/spec ~/c/foo-ui auth flow` — spec about auth flow in foo-ui
+
+Both arguments are just disambiguating hints; the full context should be clear from the conversation.
+
 Based on the current conversation, we've identified changes needed in a different local project. Write a markdown spec file in that project's directory describing the work to be done, so it can be executed in a separate Claude session scoped to that project.
 
 Steps:
-1. Identify the target project directory from context (ask if unclear)
+1. Identify the target project directory from arguments and/or conversation context (ask if unclear)
 2. Summarize the work to be done:
    - What problem are we solving / what feature are we adding?
    - Why is this needed? (context from current project if relevant)
