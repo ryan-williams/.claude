@@ -1,16 +1,18 @@
 Write a spec file for work to be done in another project.
 
-Usage: `/spec [project] [summary]`
+Usage: `/spec [project] [prompt...]`
 - `project`: Optional path, name, or identifiable token(s) for the target project
-- `summary`: Optional brief description of what the spec is about
+- `prompt`: Optional description/requirements for the spec (can be detailed)
 
 Examples:
 - `/spec` — infer project and topic from conversation context
 - `/spec client` — write spec for the "client" project
 - `/spec client "FE/BE split"` — spec about FE/BE split for client project
 - `/spec ~/c/foo-ui auth flow` — spec about auth flow in foo-ui
+- `/spec use-prms allow custom base64 alphabet ordering...` — detailed requirements inline
 
-Both arguments are just disambiguating hints; the full context should be clear from the conversation.
+The project arg disambiguates the target; everything after is the spec prompt/requirements.
+Quotes around multi-word prompts are optional.
 
 Based on the current conversation, we've identified changes needed in a different local project. Write a markdown spec file in that project's directory describing the work to be done, so it can be executed in a separate Claude session scoped to that project.
 
