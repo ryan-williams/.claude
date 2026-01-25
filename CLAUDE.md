@@ -1,8 +1,8 @@
 ## General Claude Instructions
-- Don't say "You're absolutely right!" or similar. My suggestions will sometimes be purposely incorrect, to see if you're actually following / thinking things through. You **must** correct me when I say inaccurate things, and call out when my suggestions/ideas are not most advisable or idiomatic.
-- Ensure lines don't end with trailing whitespace (in code and other text, where linters would normally check for fix this).
+- Don't say "You're absolutely right!" or similar. My suggestions will sometimes be purposely incorrect, to see if you're actually following and thinking things through. You **must** correct me when I say inaccurate things, and call out when my suggestions/ideas are not most advisable or idiomatic.
+- Ensure lines don't end with trailing whitespace (in code and other text, where linters would normally check for and fix this).
 - Ensure text files end with a single newline character.
-- Don't leave "tombstone" comments about things you remove.
+- Don't leave "tombstone" comments about code you remove.
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
 - I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
 
@@ -123,6 +123,7 @@ uv sync          # Sync dependencies
 
 ## JavaScript / Node.js
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
+- I usually use Vite, TS, and React. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
 - I ≈always want MUI Tooltips, not browser natives. Latter take too long to appear and are too small and flat/unstyleable/non-rich.
 
 ### Frequently Used JS/TS Tools and Libraries
@@ -145,11 +146,11 @@ Several tools I often use while developing other applications and libraries:
 
 And a few libraries I often use in JS/TS apps:
 - [`use-kbd`] (https://github.com/runsascoded/use-kbd): Omnibars, editable hotkeys, search, and keyboard-navigation for React apps.
-- [`@rdub/use-url-params`] (https://github.com/runsascoded/use-url-params): React hooks for managing URL query parameters with type-safe encoding/decoding
+- [`use-prms`] (https://github.com/runsascoded/use-prms): React hooks for managing URL query parameters with type-safe encoding/decoding
 - [`@rdub/base`] (https://gitlab.com/runsascoded/js/base): helpers and convenience imports arguably missing from stdlib (e.g. for Object, Array, Math, …; also some React)
 
 [`use-kbd`]: https://www.npmjs.com/package/use-kbd
-[`@rdub/use-url-params`]: https://www.npmjs.com/package/@rdub/use-url-params
+[`use-prms`]: https://www.npmjs.com/package/use-prms
 [`@rdub/base`]: https://www.npmjs.com/package/@rdub/base
 
 ## Markdown
@@ -157,6 +158,6 @@ And a few libraries I often use in JS/TS apps:
 
 ## Diffs
 `dffs` (https://github.com/runsascoded/dffs) should be `pipx install`'d and globally accessible (and also cloned at `~/c/dffs`), and exposes CLIs:
-- `diff-x` ("Diff two files after running them through a pipeline of other commands")
-- `git-diff-x` ("Diff files at two commits, or one commit and the current worktree, after applying an optional command pipeline")
+- `diff-x` ("Diff two files after running them through a pipeline of other commands"), a.k.a. `dx*`
+- `git-diff-x` ("Diff files at two commits, or one commit and the current worktree, after applying an optional command pipeline"), a.k.a. `gdx*`
 - `comm-x` ("Select or reject lines common to two input streams, after running each through a pipeline of other commands.")
