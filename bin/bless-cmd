@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Add a single permission to .claude/settings.local.json
+#
+# Usage:
+#   bless-cmd "npm run dev"        # → Bash(npm run dev:*)
+#   bless-cmd -r "npm run dev"     # Raw: adds exactly as given (no Bash wrapper)
+
+set -euo pipefail
+
+raw=false
+if [[ "${1:-}" == "-r" ]]; then
+  raw=true
+  shift
+fi
+
+cmd="${1:?Usage: bless-cmd [-r] <command>}"
+
+settings=".claude/settings.local.json"
+
+# Format permission string
+if $raw; then
+  perm="$cmd"
+else
+  perm="Bash($cmd:*)"
+fi
+
+# Create settings file if needed
+if [[ ! -f "$settings" ]]; then
+  mkdir -p .claude
+  echo '{}' > "$settings"
+fi
+
+# Check if already present
+if jq -e ".permissions.allow // [] | index(\"$perm\")" "$settings" >/dev/null 2>&1; then
+  echo "Already permitted: $perm"
+  exit 0
+fi
+
+# Add permission
+jq --arg perm "$perm" '
+  .permissions.allow = ((.permissions.allow // []) + [$perm])
+' "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
+
+echo "Added: $perm"
+echo "Restart Claude to apply: claude -c"
