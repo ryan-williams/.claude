@@ -25,6 +25,7 @@
       "Bash(curl http://localhost:*)",
       "Bash(dig:*)",
       "Bash(du:*)",
+      "Bash(dvx status:*)",
       "Bash(echo:*)",
       "Bash(env:*)",
       "Bash(file:*)",
