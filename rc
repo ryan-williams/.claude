@@ -1,0 +1,6 @@
+# Claude CLI aliases
+# Source this from your shell rc file: source ~/.claude/rc
+
+alias cld='claude'
+alias clc='claude -c'
+alias ccc='claude -c --chrome'
