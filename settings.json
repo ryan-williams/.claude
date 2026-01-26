@@ -5,6 +5,8 @@
   },
   "permissions": {
     "allow": [
+      "Bash(aws s3 ls:*)",
+
       "Bash(brew:*)",
 
       "Bash(cargo build:*)",
