@@ -23,6 +23,7 @@
       "Bash(chmod:*)",
       "Bash(curl -s http://localhost:*)",
       "Bash(curl http://localhost:*)",
+      "Bash(df:*)",
       "Bash(dig:*)",
       "Bash(du:*)",
       "Bash(dvx status:*)",
