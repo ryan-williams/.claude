@@ -6,9 +6,7 @@
   "permissions": {
     "allow": [
       "Bash(aws s3 ls:*)",
-
       "Bash(brew:*)",
-
       "Bash(cargo build:*)",
       "Bash(cargo check:*)",
       "Bash(cargo clippy:*)",
@@ -18,7 +16,6 @@
       "Bash(cargo search:*)",
       "Bash(cargo test:*)",
       "Bash(cargo tree:*)",
-
       "Bash(cat:*)",
       "Bash(chmod:*)",
       "Bash(col:*)",
@@ -59,7 +56,6 @@
       "Bash(wc:*)",
       "Bash(which:*)",
       "Bash(xxd:*)",
-
       "Bash(git branch:*)",
       "Bash(git cat-file:*)",
       "Bash(git check-ignore:*)",
@@ -74,7 +70,6 @@
       "Bash(git rev-parse:*)",
       "Bash(git show:*)",
       "Bash(git status:*)",
-
       "Bash(gh issue list:*)",
       "Bash(gh issue view:*)",
       "Bash(gh pr list:*)",
@@ -86,9 +81,13 @@
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
       "Bash(gh run watch:*)",
-
+      "Bash(gh search:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test:*)",
       "Bash(npm search:*)",
+      "Bash(npm test:*)",
       "Bash(npm view:*)",
+      "Bash(npx playwright:*)",
       "Bash(npx vitest:*)",
       "Bash(pip index:*)",
       "Bash(pip install:*)",
@@ -98,6 +97,7 @@
       "Bash(pnpm audit:*)",
       "Bash(pnpm build:*)",
       "Bash(pnpm dev:*)",
+      "Bash(pnpm exec playwright:*)",
       "Bash(pnpm exec tsc:*)",
       "Bash(pnpm install:*)",
       "Bash(pnpm lint:*)",
@@ -108,10 +108,11 @@
       "Bash(pnpm start:*)",
       "Bash(pnpm test:*)",
       "Bash(pnpm tsc:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm vitest:*)",
       "Bash(pnpm why:*)",
       "Bash(pytest:*)",
       "Bash(uv tree:*)",
-
       "WebFetch",
       "WebSearch"
     ]
