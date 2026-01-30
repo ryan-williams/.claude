@@ -1,0 +1,107 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["click"]
+# ///
+"""Copy Claude Code project configs to a new project."""
+
+from pathlib import Path
+from click import argument, option, command, echo, style
+import json
+import re
+import shutil
+import sys
+
+
+def encode_path(path: Path) -> str:
+    """Encode path to Claude's project dir format: /foo/bar/.baz → -foo-bar-baz"""
+    return re.sub(r'\.', '', str(path).replace('/', '-'))
+
+
+def copy_project_config(src_path: Path, dst_path: Path, dry_run: bool) -> bool:
+    """Copy ~/.claude/projects/ config. Returns True if copied."""
+    projects_dir = Path.home() / '.claude' / 'projects'
+    src_config = projects_dir / encode_path(src_path)
+    dst_config = projects_dir / encode_path(dst_path)
+
+    if not src_config.exists():
+        echo(f"No Claude config found at {src_config}")
+        return False
+
+    if dst_config.exists():
+        echo(style(f"Warning: {dst_config} already exists, not overwriting", fg='yellow'))
+        return False
+
+    echo(f"{'Would copy' if dry_run else 'Copying'} Claude config: {src_config.name} → {dst_config.name}")
+    if not dry_run:
+        shutil.copytree(src_config, dst_config)
+    return True
+
+
+def copy_claude_json_entry(src_path: Path, dst_path: Path, dry_run: bool) -> bool:
+    """Copy ~/.claude.json project entry. Returns True if copied."""
+    claude_json = Path.home() / '.claude.json'
+    if not claude_json.exists():
+        echo(f"No {claude_json} found")
+        return False
+
+    data = json.loads(claude_json.read_text())
+    src_key = str(src_path)
+    dst_key = str(dst_path)
+
+    if 'projects' not in data or src_key not in data['projects']:
+        echo(f"No ~/.claude.json entry for {src_path}")
+        return False
+
+    if dst_key in data.get('projects', {}):
+        echo(style(f"Warning: ~/.claude.json already has entry for {dst_path}", fg='yellow'))
+        return False
+
+    echo(f"{'Would copy' if dry_run else 'Copying'} ~/.claude.json entry: {src_key} → {dst_key}")
+    if not dry_run:
+        data['projects'][dst_key] = data['projects'][src_key].copy()
+        claude_json.write_text(json.dumps(data, indent=2) + '\n')
+    return True
+
+
+@command()
+@argument('src_path', type=str)
+@argument('dst_path', type=str)
+@option('-n', '--dry-run', is_flag=True, help="Show what would be done without doing it")
+def main(src_path: str, dst_path: str, dry_run: bool):
+    """Copy Claude Code project configs to a new project.
+
+    Copies both ~/.claude/projects/<encoded-path>/ and ~/.claude.json entries
+    from SRC_PATH to DST_PATH. Does not copy any actual project files.
+
+    Examples:
+
+        clcp ~/project/server ~/project/static   # Copy configs to sibling
+
+        clcp -n ~/old ~/new                      # Dry run
+    """
+    src = Path(src_path).resolve() if Path(src_path).exists() else None
+    dst = Path(dst_path).resolve() if Path(dst_path).exists() else None
+
+    if src is None:
+        echo(style(f"Error: Source path {src_path} doesn't exist", fg='red'), err=True)
+        sys.exit(1)
+
+    if dst is None:
+        echo(style(f"Error: Destination path {dst_path} doesn't exist", fg='red'), err=True)
+        echo("Create the directory first, then run clcp")
+        sys.exit(1)
+
+    if src == dst:
+        echo(style("Error: Source and destination are the same", fg='red'), err=True)
+        sys.exit(1)
+
+    # Copy Claude configs
+    copy_project_config(src, dst, dry_run)
+    copy_claude_json_entry(src, dst, dry_run)
+
+    echo(style("Done" + (" (dry run)" if dry_run else ""), fg='green'))
+
+
+if __name__ == '__main__':
+    main()

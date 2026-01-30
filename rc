@@ -4,3 +4,5 @@
 alias cld='claude'
 alias clc='claude -c'
 alias ccc='claude -c --chrome'
+alias cmv=claude-mv
+alias clcp=claude-cp

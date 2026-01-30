@@ -1,0 +1,159 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["click"]
+# ///
+"""Move a project directory and update its Claude Code configs."""
+
+from pathlib import Path
+from click import argument, option, command, echo, style
+import json
+import re
+import shutil
+import subprocess
+import sys
+
+
+def encode_path(path: Path) -> str:
+    """Encode path to Claude's project dir format: /foo/bar/.baz → -foo-bar-baz"""
+    return re.sub(r'\.', '', str(path).replace('/', '-'))
+
+
+def claude_running_in(path: Path) -> bool:
+    """Check if Claude is running in the given path."""
+    try:
+        result = subprocess.run(
+            ['pgrep', '-f', f'claude.*{path}'],
+            capture_output=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def update_claude_json(old_path: Path, new_path: Path, dry_run: bool) -> bool:
+    """Update ~/.claude.json project entries. Returns True if updated."""
+    claude_json = Path.home() / '.claude.json'
+    if not claude_json.exists():
+        echo(f"No {claude_json} found")
+        return False
+
+    data = json.loads(claude_json.read_text())
+    old_key = str(old_path)
+    new_key = str(new_path)
+
+    if 'projects' not in data or old_key not in data['projects']:
+        echo(f"No ~/.claude.json entry for {old_path}")
+        return False
+
+    echo(f"{'Would update' if dry_run else 'Updating'} ~/.claude.json: {old_key} → {new_key}")
+    if not dry_run:
+        data['projects'][new_key] = data['projects'].pop(old_key)
+        claude_json.write_text(json.dumps(data, indent=2) + '\n')
+    return True
+
+
+def move_project_config(old_path: Path, new_path: Path, dry_run: bool) -> bool:
+    """Move ~/.claude/projects/ config. Returns True if moved."""
+    projects_dir = Path.home() / '.claude' / 'projects'
+    old_config = projects_dir / encode_path(old_path)
+    new_config = projects_dir / encode_path(new_path)
+
+    if not old_config.exists():
+        echo(f"No Claude config found at {old_config}")
+        return False
+
+    if new_config.exists():
+        echo(style(f"Warning: {new_config} already exists, not moving", fg='yellow'))
+        return False
+
+    echo(f"{'Would move' if dry_run else 'Moving'} Claude config: {old_config.name} → {new_config.name}")
+    if not dry_run:
+        shutil.move(old_config, new_config)
+    return True
+
+
+@command()
+@argument('old_path', type=str)
+@argument('new_path', type=str)
+@option('-c', '--config-only', is_flag=True, help="Only update Claude configs, don't move files")
+@option('-n', '--dry-run', is_flag=True, help="Show what would be done without doing it")
+def main(old_path: str, new_path: str, config_only: bool, dry_run: bool):
+    """Move a project directory and update its Claude Code configs.
+
+    Updates both ~/.claude/projects/<encoded-path>/ and ~/.claude.json entries.
+
+    Examples:
+
+        cmv ~/old/project ~/new/project     # Move dir and update configs
+
+        cmv -c ~/parent ~/parent/subdir     # Config-only: both dirs exist
+
+        cmv -n ~/old ~/new                  # Dry run: show what would happen
+    """
+    old = Path(old_path).resolve() if Path(old_path).exists() else None
+    new = Path(new_path).resolve() if Path(new_path).exists() else None
+
+    # Resolve non-existent new path via parent
+    if new is None:
+        new_p = Path(new_path)
+        if new_p.parent.exists():
+            new = new_p.parent.resolve() / new_p.name
+        else:
+            echo(style(f"Error: Parent directory of {new_path} doesn't exist", fg='red'), err=True)
+            sys.exit(1)
+
+    # Determine what to do based on existence
+    if old is None and new is None:
+        echo(style(f"Error: Neither {old_path} nor {new_path} exists", fg='red'), err=True)
+        sys.exit(1)
+
+    if old is not None and new is not None and old != new:
+        if not config_only:
+            echo(style(f"Error: Both {old_path} and {new_path} exist", fg='red'), err=True)
+            echo("Use --config-only to just update Claude configs without moving files")
+            sys.exit(1)
+        # Config-only mode with both existing
+        old_resolved = old
+        new_resolved = new
+        skip_move = True
+    elif old is not None and new is None:
+        # Normal: old exists, new doesn't
+        old_resolved = old
+        new_resolved = new  # Already resolved above
+        skip_move = config_only
+    elif old is None and new is not None:
+        # Already moved: old doesn't exist, new does
+        echo(f"Note: {old_path} doesn't exist but {new_path} does; assuming mv already done")
+        # Infer old_resolved from raw path
+        old_resolved = Path(old_path) if Path(old_path).is_absolute() else Path.cwd() / old_path
+        old_resolved = Path(str(old_resolved).rstrip('/'))
+        new_resolved = new
+        skip_move = True
+    else:
+        # old == new (same path)
+        echo(style("Error: Old and new paths are the same", fg='red'), err=True)
+        sys.exit(1)
+
+    # Safety check: Claude running?
+    for check in [old_resolved, new_resolved]:
+        if check.exists() and claude_running_in(check):
+            echo(style(f"Error: Claude appears to be running in {check}", fg='red'), err=True)
+            echo("Exit that session first, then retry.")
+            sys.exit(1)
+
+    # Move directory if needed
+    if not skip_move:
+        echo(f"{'Would move' if dry_run else 'Moving'} project: {old_resolved} → {new_resolved}")
+        if not dry_run:
+            shutil.move(old_resolved, new_resolved)
+
+    # Update Claude configs
+    move_project_config(old_resolved, new_resolved, dry_run)
+    update_claude_json(old_resolved, new_resolved, dry_run)
+
+    echo(style("Done" + (" (dry run)" if dry_run else ""), fg='green'))
+
+
+if __name__ == '__main__':
+    main()
