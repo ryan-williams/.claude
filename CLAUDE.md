@@ -14,6 +14,12 @@ I use these acronyms and abbreviations:
 - **USCs**: UnStaged Changes
 - **UFs**: Untracked Files (Git)
 - **TP** / **FP** / **TN** / **FN**: True Positive / False Positive / True Negative / False Negative
+- OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena)
+- MD = metadata (or Markdown)
+- In JS / web projects:
+  - FE / BE = Frontend / Backend, BB = Bounding Box
+  - LS / SS = localStorage / sessionStorage
+- SS can also be "screenshot"
 
 I also use single-capital letter abbreviations ad hoc when it should be clear from context what noun (proper or otherwise) I mean.
 
