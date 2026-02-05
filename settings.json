@@ -1,8 +1,4 @@
 {
-  "alwaysThinkingEnabled": true,
-  "feedbackSurveyState": {
-    "lastShownTime": 1754000331023
-  },
   "permissions": {
     "allow": [
       "Bash(aws s3 ls:*)",
@@ -62,8 +58,10 @@
       "Bash([:*)",
       "Bash(wc:*)",
       "Bash(which:*)",
+      "Bash(xq:*)",
       "Bash(xxd:*)",
       "Bash(yes:*)",
+      "Bash(yq:*)",
       "Bash(zip:*)",
       "Bash(git branch:*)",
       "Bash(git cat-file:*)",
@@ -91,6 +89,7 @@
       "Bash(gh run view:*)",
       "Bash(gh run watch:*)",
       "Bash(gh search:*)",
+      "Bash(gh workflow list:*)",
       "Bash(npm run build:*)",
       "Bash(npm run test:*)",
       "Bash(npm search:*)",
@@ -125,5 +124,10 @@
       "WebFetch",
       "WebSearch"
     ]
+  },
+  "alwaysThinkingEnabled": true,
+  "autoUpdatesChannel": "latest",
+  "feedbackSurveyState": {
+    "lastShownTime": 1754000331023
   }
 }
