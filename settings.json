@@ -2,6 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(aws s3 ls:*)",
+      "Bash(aws s3api get-bucket-cors:*)",
+      "Bash(aws s3api get-bucket-policy:*)",
+      "Bash(aws s3api get-public-access-block:*)",
+      "Bash(aws sts get-caller-identity:*)",
       "Bash(brew:*)",
       "Bash(cargo build:*)",
       "Bash(cargo check:*)",
@@ -110,6 +114,7 @@
       "Bash(pnpm install:*)",
       "Bash(pnpm lint:*)",
       "Bash(pnpm list:*)",
+      "Bash(pnpm ls:*)",
       "Bash(pnpm outdated:*)",
       "Bash(pnpm run:*)",
       "Bash(pnpm search:*)",
@@ -120,7 +125,9 @@
       "Bash(pnpm vitest:*)",
       "Bash(pnpm why:*)",
       "Bash(pytest:*)",
+      "Bash(ruff:*)",
       "Bash(uv tree:*)",
+      "Bash(uvx pre-commit:*)",
       "WebFetch",
       "WebSearch"
     ]
