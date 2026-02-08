@@ -5,6 +5,9 @@
 - Don't leave "tombstone" comments about code you remove.
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
 - I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
+- When I want a Claude session in one project to make changes in another project, I will have a separate session run in that project. I avoid having multiple Claude sessions active in any given project/directory.
+  - The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there. 
+  - You can write into `specs/` in the root dir of the target project; I'll generally `.git/info/exclude` that dir, or leave it untracked.  
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations:
