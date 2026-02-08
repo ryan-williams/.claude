@@ -15,12 +15,15 @@ I use these acronyms and abbreviations:
 - **UFs**: Untracked Files (Git)
 - **TP** / **FP** / **TN** / **FN**: True Positive / False Positive / True Negative / False Negative
 - **BC** = backwards-compatibility (a.k.a. back-compat). Often I'm working on code that I've not pushed anywhere, and BC concerns would only have to do with other checkpoints in my current feature branch, where BC is not important, and is even negative-value (bc it adds needless code complexity). In such cases I might just say "forget BC" or similar.
+- **FFR** = For Future Reference
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
 - GH = GitHub, GL = GitLab, GHA = GitHub Actions
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
   - LS / SS = localStorage / sessionStorage
+  - LM / DM = Light Mode / Dark Mode (for theming)
+  - vp / vh / vw = viewport, viewport height, viewport width
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 
 I also use single-capital letter abbreviations ad hoc when it should be clear from context what noun (proper or otherwise) I mean.
