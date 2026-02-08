@@ -24,7 +24,7 @@ I use these acronyms and abbreviations:
 - GH = GitHub, GL = GitLab, GHA = GitHub Actions
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
-  - LS / SS = localStorage / sessionStorage
+  - LS / SS = `localStorage` / `sessionStorage`
   - LM / DM = Light Mode / Dark Mode (for theming)
   - vp / vh / vw = viewport, viewport height, viewport width
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
@@ -139,6 +139,8 @@ uv sync          # Sync dependencies
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
 - I usually use Vite, TS, and React. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
 - I ≈always want MUI Tooltips, not browser natives. Latter take too long to appear and are too small and flat/unstyleable/non-rich.
+- Each project should default its dev (or built) servers to a hopefully-unique, unused port (not Vite's default 5173, slidev's 3030, http-server's 8080, etc.) to avoid conflicts when running multiple projects at once. A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
+- Check whether there's a server running on the desired port before starting a dev server and, if so, warn and prompt me. Sometimes this will be a dev server I am running in the project, meaning you don't have to boot your own.
 
 ### Frequently Used JS/TS Tools and Libraries
 `$js` (`~/c/js`) is a root dir for JS/TS projects I maintain, most of which live at https://gitlab.com/runsascoded/js.
