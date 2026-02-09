@@ -142,6 +142,22 @@ uv sync          # Sync dependencies
 - Each project should default its dev (or built) servers to a hopefully-unique, unused port (not Vite's default 5173, slidev's 3030, http-server's 8080, etc.) to avoid conflicts when running multiple projects at once. A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
 - Check whether there's a server running on the desired port before starting a dev server and, if so, warn and prompt me. Sometimes this will be a dev server I am running in the project, meaning you don't have to boot your own.
 
+My `vite.config.ts` will usually do something like:
+
+```ts
+const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') ?? []
+
+export default defineConfig({
+  server: {
+    port: 3201,  // ≈unique to project
+    host: true,
+    allowedHosts,
+  },
+})
+```
+
+so that my tailnet can access dev servers (via `$VITE_ALLOWED_HOSTS`).
+
 ### Frequently Used JS/TS Tools and Libraries
 `$js` (`~/c/js`) is a root dir for JS/TS projects I maintain, most of which live at https://gitlab.com/runsascoded/js.
 
