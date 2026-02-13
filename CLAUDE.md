@@ -4,6 +4,7 @@
 - Ensure text files end with a single newline character.
 - Don't leave "tombstone" comments about code you remove.
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
+  - `curl`s should write their outputs to a local file, then read from there (more like typical `wget` usage). You shouldn't have to `curl` the same file twice in quick succession / if you're not expecting it to have changed.
 - I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
 - When I want a Claude session in one project to make changes in another project, I will have a separate session run in that project. I avoid having multiple Claude sessions active in any given project/directory.
   - The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there. 
@@ -21,6 +22,10 @@ I use these acronyms and abbreviations:
 - **FFR** = For Future Reference
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
+- SFs = significant figures / sig-figs
+- RG = regenerate
+- IDP = idempotent, IDPy = idempotency.
+  - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
 - GH = GitHub, GL = GitLab, GHA = GitHub Actions
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
@@ -29,13 +34,13 @@ I use these acronyms and abbreviations:
   - vp / vh / vw = viewport, viewport height, viewport width
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 
-I also use single-capital letter abbreviations ad hoc when it should be clear from context what noun (proper or otherwise) I mean.
+I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
 ## Git Usage Conventions
 - **Avoid `git add -A`**: I often have persistent untracked files and directories I don't want to commit. `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
 - Similarly, **don't use `git clean -fd`** or similar; I often have untracked files/dirs that are important and I want to keep.
 - Don't `git commit` changes unless I've told you to (on a per-session basis).
-- Don't write to global `/tmp` dirs, use local `tmp/...` subdirs instead.
+- Don't write to global `/tmp` dirs, use local/relative `tmp/...` subdirs instead.
 - If I link to or mention a GitHub Actions job / URL, read its logs (using `gh run view --log`) to understand what happened.
   - Save the logs to a local file, then read from there (so you don't have to fetch them more than once).
 - My Git remote names are usually single chars corresponding to the GitHub org of the repo (or a given fork); I avoid `origin`, and have `git config --global clone.defaultRemoteName u` (for "upstream").
@@ -135,12 +140,14 @@ uv sync          # Sync dependencies
   - Log statements should go to stderr (using `err`); use stdout for primary / pipe-able / parse-able output.
   - Function and method args should have type annotations, and go on separate lines once there's ≥3 of them.
 
-## JavaScript / Node.js
+## JavaScript / TypeScript / Node.js / Web Development
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
-- I usually use Vite, TS, and React. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
-- I ≈always want MUI Tooltips, not browser natives. Latter take too long to appear and are too small and flat/unstyleable/non-rich.
-- Each project should default its dev (or built) servers to a hopefully-unique, unused port (not Vite's default 5173, slidev's 3030, http-server's 8080, etc.) to avoid conflicts when running multiple projects at once. A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
-- Check whether there's a server running on the desired port before starting a dev server and, if so, warn and prompt me. Sometimes this will be a dev server I am running in the project, meaning you don't have to boot your own.
+- I usually use Vite, TS, React, and SASS. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
+- I ≈always want MUI Tooltips, not browser-native tooltips. The latter take too long to appear, and are too small/flat/unstyleable/plain.
+- Each project should default its dev (or built) servers to a hopefully-unique, unused port (not Vite's default 5173, slidev's 3030, http-server's 8080, etc.) to avoid conflicts when running multiple projects simultaneously on a given host.
+  - A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
+- Check whether there's a server running on the desired port before starting any server and, if so, warn and prompt me.
+  - Sometimes this will be a dev server I am running in the project, meaning you don't have to boot your own.
 
 My `vite.config.ts` will usually do something like:
 
@@ -156,10 +163,10 @@ export default defineConfig({
 })
 ```
 
-so that my tailnet can access dev servers (via `$VITE_ALLOWED_HOSTS`).
+so that my tailnet can access dev servers (via `$VITE_ALLOWED_HOSTS`, which my dotfiles set).
 
 ### Frequently Used JS/TS Tools and Libraries
-`$js` (`~/c/js`) is a root dir for JS/TS projects I maintain, most of which live at https://gitlab.com/runsascoded/js.
+`$js` (`~/c/js`) is a root dir for JS/TS projects I maintain, most of which live under https://gitlab.com/runsascoded/js.
 
 Several tools I often use while developing other applications and libraries:
 
@@ -171,6 +178,7 @@ Several tools I often use while developing other applications and libraries:
     - Manages settings in 2-3 places, including `pnpm-workspace.yaml`, that are necessary for "hot-reloading" of local dependencies to work.
   - `pds [gh|gl] <name>`: point at a recent Git{Hu,La}b "dist"-branch build
   - `pds [n|npm] <name> [version]`: point at latest published npm version
+  - `pds` stores its config state in a `.pnpm-dep-source.json` file, in each web project's root dir.
 - [`scrns`] (https://gitlab.com/runsascoded/js/scrns): screenshot automation tool, frequently used for preview images in `README.md`s, `og:image`s, etc.
 
 [`pnpm-dep-source`]: https://www.npmjs.com/package/pnpm-dep-source
@@ -186,7 +194,7 @@ And a few libraries I often use in JS/TS apps:
 [`@rdub/base`]: https://www.npmjs.com/package/@rdub/base
 
 ## Markdown
-- Define links' hrefs in the "footer", so that the inline link only requires writing e.g. `[anchor text]` or `[long anchor text][short name]`.
+- Define links' hrefs in the "footer", so that the inline links only require writing e.g. `[anchor text]` or `[long anchor text][short name]`, not full URLs.
 
 ## Diffs
 `dffs` (https://github.com/runsascoded/dffs) should be `pipx install`'d and globally accessible (and also cloned at `~/c/dffs`), and exposes CLIs:
