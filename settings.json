@@ -65,6 +65,7 @@
       "Bash(test:*)",
       "Bash(tree:*)",
       "Bash([:*)",
+      "Bash(wasm-pack build:*)",
       "Bash(wc:*)",
       "Bash(which:*)",
       "Bash(xq:*)",
