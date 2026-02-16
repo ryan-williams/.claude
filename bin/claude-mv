@@ -91,8 +91,10 @@ def main(old_path: str, new_path: str, config_only: bool, dry_run: bool):
 
         cmv -n ~/old ~/new                  # Dry run: show what would happen
     """
-    old = Path(old_path).resolve() if Path(old_path).exists() else None
-    new = Path(new_path).resolve() if Path(new_path).exists() else None
+    old_exists = Path(old_path).exists()
+    new_exists = Path(new_path).exists()
+    old = Path(old_path).resolve() if old_exists else None
+    new = Path(new_path).resolve() if new_exists else None
 
     # Resolve non-existent new path via parent
     if new is None:
@@ -104,11 +106,11 @@ def main(old_path: str, new_path: str, config_only: bool, dry_run: bool):
             sys.exit(1)
 
     # Determine what to do based on existence
-    if old is None and new is None:
+    if not old_exists and not new_exists:
         echo(style(f"Error: Neither {old_path} nor {new_path} exists", fg='red'), err=True)
         sys.exit(1)
 
-    if old is not None and new is not None and old != new:
+    if old_exists and new_exists and old != new:
         if not config_only:
             echo(style(f"Error: Both {old_path} and {new_path} exist", fg='red'), err=True)
             echo("Use --config-only to just update Claude configs without moving files")
@@ -117,16 +119,16 @@ def main(old_path: str, new_path: str, config_only: bool, dry_run: bool):
         old_resolved = old
         new_resolved = new
         skip_move = True
-    elif old is not None and new is None:
+    elif old_exists and not new_exists:
         # Normal: old exists, new doesn't
         old_resolved = old
         new_resolved = new  # Already resolved above
         skip_move = config_only
-    elif old is None and new is not None:
+    elif not old_exists and new_exists:
         # Already moved: old doesn't exist, new does
         echo(f"Note: {old_path} doesn't exist but {new_path} does; assuming mv already done")
         # Infer old_resolved from raw path
-        old_resolved = Path(old_path) if Path(old_path).is_absolute() else Path.cwd() / old_path
+        old_resolved = Path(old_path).resolve() if Path(old_path).is_absolute() else (Path.cwd() / old_path).resolve()
         old_resolved = Path(str(old_resolved).rstrip('/'))
         new_resolved = new
         skip_move = True
