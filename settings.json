@@ -91,6 +91,7 @@
       "Bash(git status:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue view:*)",
+      "Bash(gh pr checks:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
       "Bash(gh release view:*)",
@@ -135,12 +136,14 @@
       "Bash(pnpm typecheck:*)",
       "Bash(pnpm vitest:*)",
       "Bash(pnpm why:*)",
+      "Bash(python -m pytest:*)",
       "Bash(pytest:*)",
       "Bash(rg:*)",
       "Bash(ruff:*)",
       "Bash(uv sync:*)",
       "Bash(uv tree:*)",
       "Bash(uvx pre-commit:*)",
+      "Bash(uvx ruff:*)",
       "WebFetch",
       "WebSearch"
     ]
