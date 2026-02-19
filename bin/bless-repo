@@ -4,6 +4,10 @@
 # Usage:
 #   bless-repo           # Bless current repo (git cmd:*)
 #   bless-repo /path     # Bless other repo (git -C /path cmd:*)
+#
+# When adding generic permissions, removes path-specific entries they subsume.
+# When adding path-specific permissions, skips commands already covered generically.
+# Groups git entries together in the permissions array.
 
 set -euo pipefail
 
@@ -13,12 +17,10 @@ settings=".claude/settings.local.json"
 cmds=(branch cat-file check-ignore diff fetch log ls-files ls-tree reflog remote rev-list show status)
 
 if [[ $# -eq 0 ]]; then
-  # No args: bless current repo without -C prefix
   use_c_flag=false
   repo="$(pwd)"
   label="current repo"
 else
-  # With arg: bless specified repo with -C prefix
   use_c_flag=true
   repo="$(cd "$1" && pwd)"  # Resolve to absolute path
   label="$repo"
@@ -33,12 +35,17 @@ fi
 # Get existing permissions
 existing=$(jq -r '.permissions.allow // [] | .[]' "$settings" 2>/dev/null || echo "")
 
-# Build list of new permissions (skip existing)
 new_perms=()
 skipped=()
 for cmd in "${cmds[@]}"; do
   if $use_c_flag; then
     perm="Bash(git -C $repo $cmd:*)"
+    generic="Bash(git $cmd:*)"
+    # Skip if generic permission already covers this
+    if echo "$existing" | grep -qxF "$generic"; then
+      skipped+=("$cmd")
+      continue
+    fi
   else
     perm="Bash(git $cmd:*)"
   fi
@@ -49,17 +56,75 @@ for cmd in "${cmds[@]}"; do
   fi
 done
 
-if [[ ${#new_perms[@]} -eq 0 ]]; then
+# When adding generic permissions, find path-specific ones to remove (subsumed)
+remove_perms=()
+if ! $use_c_flag; then
+  for cmd in "${cmds[@]}"; do
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && remove_perms+=("$line")
+    done < <(echo "$existing" | grep -E "^Bash\(git -C .+ ${cmd}[^a-z-]" || true)
+  done
+fi
+
+if [[ ${#new_perms[@]} -eq 0 && ${#remove_perms[@]} -eq 0 ]]; then
   echo "All ${#cmds[@]} git commands already permitted for $label"
   exit 0
 fi
 
-# Add new permissions using jq
-jq --argjson new "$(printf '%s\n' "${new_perms[@]}" | jq -R . | jq -s .)" '
-  .permissions.allow = ((.permissions.allow // []) + $new)
+# Build JSON arrays for jq
+if [[ ${#new_perms[@]} -gt 0 ]]; then
+  jq_new="$(printf '%s\n' "${new_perms[@]}" | jq -R . | jq -s .)"
+else
+  jq_new="[]"
+fi
+if [[ ${#remove_perms[@]} -gt 0 ]]; then
+  jq_remove="$(printf '%s\n' "${remove_perms[@]}" | jq -R . | jq -s .)"
+else
+  jq_remove="[]"
+fi
+
+# Determine group prefix for insertion point
+if $use_c_flag; then
+  group_prefix="Bash(git -C $repo "
+else
+  group_prefix="Bash(git "
+fi
+
+# Update settings:
+# 1. Remove subsumed path-specific entries
+# 2. Insert new entries grouped with existing git permissions
+jq --argjson new "$jq_new" --argjson remove "$jq_remove" --arg gp "$group_prefix" '
+  .permissions.allow = (
+    (.permissions.allow // []) |
+    # Remove subsumed entries
+    [.[] | select(. as $p | ($remove | index($p)) | not)] |
+    . as $cleaned |
+    if ($new | length) == 0 then $cleaned
+    else
+      # Find insertion point: prefer specific group, fall back to any git entry
+      (
+        [$cleaned | to_entries[] | select(.value | startswith($gp))]
+        | if length > 0 then last.key else null end
+      ) as $specific |
+      (
+        [$cleaned | to_entries[] | select(.value | startswith("Bash(git "))]
+        | if length > 0 then last.key else null end
+      ) as $any_git |
+      ($specific // $any_git) as $idx |
+      if $idx != null then $cleaned[:$idx+1] + $new + $cleaned[$idx+1:]
+      else $cleaned + $new
+      end
+    end
+  )
 ' "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
 
-echo "Added ${#new_perms[@]} git permissions for $label"
+# Report
+if [[ ${#new_perms[@]} -gt 0 ]]; then
+  echo "Added ${#new_perms[@]} git permissions for $label"
+fi
+if [[ ${#remove_perms[@]} -gt 0 ]]; then
+  echo "Removed ${#remove_perms[@]} subsumed path-specific entries"
+fi
 if [[ ${#skipped[@]} -gt 0 ]]; then
   echo "Skipped ${#skipped[@]} (already present): ${skipped[*]}"
 fi
