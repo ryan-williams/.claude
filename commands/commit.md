@@ -1,46 +1,68 @@
-Analyze uncommitted changes and create a commit.
+Flexible Git workflow command supporting a pipeline of phases.
 
-Flags:
-- `-s` or `--staged`: Only commit currently staged changes (don't stage anything new)
+## Usage
+- `/c` — commit (default, same as `/commit`)
+- `/c <phases>` — run phases in order
+- `/c <phases> <workflow-hint>` — run phases, with a hint for GHA workflow dispatch
 
-If the user provided a path after `/commit`, change to that directory first (it should be its own Git repo).
-If no path provided, work in the current directory.
+## Phases
+A phases string is a sequence of characters from `{t, c, a, s, p, d, w}`:
+- `t` = **test**: run the project's test suite before proceeding (infer: `pytest`, `pnpm test`, `cargo test`, etc.)
+- `c` = **commit**: create a new commit (per `/commit` conventions)
+- `a` = **amend**: amend HEAD (per `/amend` conventions)
+- `s` = **staged**: only commit staged changes (modifies `c` phase; like `/commit --staged`)
+- `p` = **push**: push to remote
+  - Uses `gpu` (push to user branch) if the branch looks like a feature/working branch
+  - Uses `git push` if the branch already tracks a remote
+  - Force-pushes (`gpuf` / `git push -f`) if `a` (amend) was in the phases
+- `d` = **dispatch**: trigger a GHA workflow
+  - If a workflow hint is provided (second arg), use `ghwr <hint>` for fuzzy-matching
+  - If no hint, look for a single `workflow_dispatch`-enabled workflow; if ambiguous, ask
+  - Pass `--no-open` since we'll watch via `w` phase (or the user can open manually)
+- `w` = **watch**: watch the just-dispatched GHA run via `gh run watch`, then report the result
 
-Steps:
-1. Parse arguments for flags (`-s`/`--staged`) and optional path
-2. If a path was provided:
-   - Change to that directory using `cd <path>`
-   - Verify it's a Git repository with `git rev-parse --git-dir`
-3. Run these commands in parallel to understand the changes:
-   - `git status` to see staged, unstaged, and untracked files
-   - `git diff` to see unstaged changes
-   - `git diff --cached` to see staged changes
-   - `git log -5 --oneline` to see recent commit messages (for style consistency)
-4. Determine what to commit:
-   - If `--staged` flag: only consider currently staged changes (skip step 6)
-   - Otherwise: consider all uncommitted changes (staged + unstaged + relevant untracked)
-5. Analyze the changes to be committed:
-   - Identify the nature of changes (new feature, bug fix, refactoring, docs, etc.)
-   - Don't commit files that likely contain secrets (`.env`, `credentials.json`, etc.)
-   - If such files are present, warn the user
-6. Stage changes (skip if `--staged` flag):
-   - Use `git add -u` for modified tracked files
-   - Use `git add <specific files>` for any new untracked files that should be committed
-7. Draft a concise commit message:
-   - Use backticks around code symbols (functions, variables, file names, commands)
-   - Focus on the "why" rather than just the "what"
-   - Ensure it accurately reflects the changes and their purpose
-   - Follow the style of recent commits in the repo
-8. Create the commit with the message ending with:
-   ```
-   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+## Constraints
+- `c` and `a` are mutually exclusive (error if both present)
+- `s` only applies if `c` is present (error otherwise)
+- `d` requires that a push happened (either `p` in phases, or branch already up-to-date with remote)
+- `w` requires `d` (nothing to watch without a dispatch)
+- If any phase fails, stop and report the error (don't continue to subsequent phases)
 
-   Co-Authored-By: Claude <noreply@anthropic.com>
-   ```
-9. Run `git status` after the commit to verify success
+## Detecting phases mode
+If the first non-flag argument matches `^[tcaspdw]+$` (and isn't a filesystem path), treat it as a phases string. Otherwise, fall back to default commit behavior (pass all args through to `/commit` logic).
 
-Important:
-- Use a HEREDOC for the commit message to ensure proper formatting
-- NEVER use `git add -A`; use `git add -u` and explicit file adds
-- If there are no changes to commit, say so (don't create an empty commit)
-- Don't push unless explicitly asked
+## Phase execution details
+
+### Test (`t`)
+- Detect test framework from project files (`pyproject.toml` → pytest, `package.json` → pnpm test, `Cargo.toml` → cargo test, etc.)
+- Run tests; abort pipeline if tests fail
+
+### Commit (`c`) / Amend (`a`)
+- Follow the same conventions as `/commit` and `/amend` respectively
+- Stage changes, draft message, create commit
+
+### Push (`p`)
+- Determine push method:
+  1. Check if branch has a remote tracking branch (`git rev-parse --abbrev-ref @{u}`)
+  2. If yes: `git push` (or `git push -f` if amending)
+  3. If no: `gpu` (or `gpuf` if amending) to push to user branch namespace
+- Before pushing, verify there are commits to push (compare with upstream if tracking)
+
+### Dispatch (`d`)
+- Run: `ghwr <workflow-hint> --no-open` (or `github-workflows.py run <hint> --no-open`)
+- If no hint provided, check `.github/workflows/` for `workflow_dispatch`-enabled workflows
+- If exactly one found, use it; if multiple, list them and ask the user
+- Capture the run ID from ghwr output for the watch phase
+
+### Watch (`w`)
+- After dispatch, find the just-triggered run:
+  - Parse the run ID from the dispatch phase's output, or
+  - Use `gh run list -w <workflow> -L 1 --json databaseId` to find the latest run
+- Run `gh run watch <run-id>` to stream status
+- When done, report success/failure and show the run URL
+
+## Default behavior (no phases string)
+When invoked as just `/c` with no phases argument (or with flags like `-s`), behave exactly like `/commit`:
+- `/c` = `/commit`
+- `/c -s` = `/commit --staged`
+- `/c path/to/repo` = `/commit path/to/repo`
