@@ -8,7 +8,11 @@
 - I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
 - When I want a Claude session in one project to make changes in another project, I will have a separate session run in that project. I avoid having multiple Claude sessions active in any given project/directory.
   - The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there. 
-  - You can write into `specs/` in the root dir of the target project; I'll generally `.git/info/exclude` that dir, or leave it untracked.  
+  - Write into `specs/` in the root dir of the target project.
+  - In the target project:
+    - Commit the initial `specs/….md` before starting to implement.
+    - When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
+    - If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations:
