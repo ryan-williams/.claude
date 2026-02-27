@@ -31,6 +31,7 @@ I use these acronyms and abbreviations:
 - IDP = idempotent, IDPy = idempotency.
   - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
 - GH = GitHub, GL = GitLab, GHA = GitHub Actions
+- "nop" = no-op
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
   - LS / SS = `localStorage` / `sessionStorage`
