@@ -91,14 +91,21 @@ def main(old_path: str, new_path: str, config_only: bool, dry_run: bool):
 
         cmv -n ~/old ~/new                  # Dry run: show what would happen
     """
-    old_exists = Path(old_path).exists()
-    new_exists = Path(new_path).exists()
-    old = Path(old_path).resolve() if old_exists else None
-    new = Path(new_path).resolve() if new_exists else None
+    old_p = Path(old_path)
+    new_p = Path(new_path)
+
+    # Trailing slash on destination = "move into this directory" (append source basename)
+    if new_path.endswith('/'):
+        new_p = new_p / old_p.name
+        new_path = str(new_p)
+
+    old_exists = old_p.exists()
+    new_exists = new_p.exists()
+    old = old_p.resolve() if old_exists else None
+    new = new_p.resolve() if new_exists else None
 
     # Resolve non-existent new path via parent
     if new is None:
-        new_p = Path(new_path)
         if new_p.parent.exists():
             new = new_p.parent.resolve() / new_p.name
         else:
