@@ -26,6 +26,8 @@ I use these acronyms and abbreviations:
 - **FFR** = For Future Reference
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
+- AR = aspect ratio (a.k.a. "dims" for "dimensions")
+- HLB = "headless browser", HFB = "headful browser"
 - SFs = significant figures / sig-figs
 - RG = regenerate
 - IDP = idempotent, IDPy = idempotency.
@@ -57,6 +59,16 @@ I also use ad hoc single-capital-letter abbreviations, when it should be clear f
   - The script auto-detects the tracking remote or uses `-r <remote>` flag
 - **Commit messages**: Use backticks around code symbols (functions, variables, file names, commands, etc.) in commit messages. GitHub renders these in PR/issue titles and bodies, making it clear what refers to code.
 - **Non-interactive rebase**: Use `g rni` (`git rebase-noninteractive`) to apply rebase plans from stdin without interactive editing. Useful for scripted rewording/reordering.
+
+### [`ghpr`] ([`ghpr-py`])
+> "Clone" GitHub PRs/issues, locally edit title/description/comments, "push" back to GitHub, and mirror to Gists.
+
+I `ghpr clone` (`ghprc`) GitHub PRs and issues to local directories for editing, make commits in local Git repos for each (`gh/` generally just left untracked by parent project, or added to `.git/info/exclude`), then `ghpr push` (`ghprp`) them back to GitHub (and a Gist that mirrors each). This allows me to edit PR/issue titles, descriptions, and comments in my local editor, with the full power of Markdown and no character limits, and then sync those changes back to GitHub.
+
+If I ask you update a PR or issue title, description, or comment, check if it's already "cloned" under `gh/` (from actual project's root). If it is, make edits there (and commit, typically, then prompt me to review diffs with `ghprd` and `ghprp` push).
+
+[`ghpr`]: https://github.com/runsascoded/ghpr
+[`ghpr-py`]: https://pypi.org/project/ghpr-py/
 
 ## Dotfiles / Bash
 - [runsascoded/.rc] is cloned at `~/.rc`, containing scripts and `alias`es I use frequently, grouped into Git submodules ≈per tool or category, e.g.:
