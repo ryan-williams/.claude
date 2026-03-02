@@ -27,9 +27,10 @@ I use these acronyms and abbreviations:
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
 - AR = aspect ratio (a.k.a. "dims" for "dimensions")
-- HLB = "headless browser", HFB = "headful browser"
+- HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless)
 - SFs = significant figures / sig-figs
 - sg = sounds good
+- gt = ground truth
 - RG = regenerate
 - IDP = idempotent, IDPy = idempotency.
   - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
