@@ -117,6 +117,7 @@
       "Bash(pip show:*)",
       "Bash(pipx list:*)",
       "Bash(pnpm add:*)",
+      "Bash(pnpm approve-builds:*)",
       "Bash(pnpm audit:*)",
       "Bash(pnpm build:*)",
       "Bash(pnpm bundle:*)",
