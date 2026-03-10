@@ -14,34 +14,39 @@
     - When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
     - If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
 
+
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations:
 - **WT**: Git worktree
 - **UCs**: Uncommitted Changes (staged and unstaged)
 - **SCs**: Staged Changes (Git index)
 - **USCs**: UnStaged Changes
-- **UFs**: Untracked Files (Git)
+- **UFs** / **UTs**: UnTracked Files (Git)
 - **TP** / **FP** / **TN** / **FN**: True Positive / False Positive / True Negative / False Negative
 - **BC** = backwards-compatibility (a.k.a. back-compat). Often I'm working on code that I've not pushed anywhere, and BC concerns would only have to do with other checkpoints in my current feature branch, where BC is not important, and is even negative-value (bc it adds needless code complexity). In such cases I might just say "forget BC" or similar.
 - **FFR** = For Future Reference
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
+- PoLS = Principle of Least Surprise
 - AR = aspect ratio (a.k.a. "dims" for "dimensions")
-- HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless)
+- HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless), PW = PlayWright (usual HLB library of choice), PPTR = Puppeteer (another HLB library)
 - SFs = significant figures / sig-figs
 - sg = sounds good
 - gt = ground truth
 - RG = regenerate
+- r13y = reproducibility
 - IDP = idempotent, IDPy = idempotency.
   - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
 - GH = GitHub, GL = GitLab, GHA = GitHub Actions
 - "nop" = no-op
+- ogi = `og:image`
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
   - LS / SS = `localStorage` / `sessionStorage`
   - LM / DM = Light Mode / Dark Mode (for theming)
   - vp / vh / vw = viewport, viewport height, viewport width
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
+- DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
@@ -52,13 +57,16 @@ I also use ad hoc single-capital-letter abbreviations, when it should be clear f
 - Don't write to global `/tmp` dirs, use local/relative `tmp/...` subdirs instead.
 - If I link to or mention a GitHub Actions job / URL, read its logs (using `gh run view --log`) to understand what happened.
   - Save the logs to a local file, then read from there (so you don't have to fetch them more than once).
+- Similarly, GitLab /jobs links mean `glab ci [view|trace] ...` + save to file for analysis.
+- When pushing to a repo with GH or GL CI, `watch` the CI after pushing, to make sure it passed. That can happen in background, but I want to know if it fails especially. In that case, you should DL the logs and debug.
 - My Git remote names are usually single chars corresponding to the GitHub org of the repo (or a given fork); I avoid `origin`, and have `git config --global clone.defaultRemoteName u` (for "upstream").
 - You're usually in a Git-tracked directory, so you don't need to copy files to "_v2", ".bak", or "_copy" versions when making big changes.
   - Use Git branches instead of `.bak` files or untracked copies of files, `_v2` suffixes, etc.
-- **User branches**: I use `gpu` (`git push-user-branch`) to push local branches to remote user namespaces
+- **User branches**: In repos with many other contributors, I use `gpu` (`git push-user-branch`) to push local branches to remote user namespaces
   - Example: `gpu` on local branch `feat` pushes to `u/rw/feat` (where `rw` is from `GIT_USER_BRANCH_PREFIX`)
   - Variants: `gpuf` (force), `gpun` (dry-run)
   - The script auto-detects the tracking remote or uses `-r <remote>` flag
+  - If a repo is just me, or 1-2 others, I may not bother with that, and regular `push` is fine.
 - **Commit messages**: Use backticks around code symbols (functions, variables, file names, commands, etc.) in commit messages. GitHub renders these in PR/issue titles and bodies, making it clear what refers to code.
 - **Non-interactive rebase**: Use `g rni` (`git rebase-noninteractive`) to apply rebase plans from stdin without interactive editing. Useful for scripted rewording/reordering.
 
@@ -162,7 +170,7 @@ uv sync          # Sync dependencies
 ## JavaScript / TypeScript / Node.js / Web Development
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
 - I usually use Vite, TS, React, and SASS. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
-- I ≈always want MUI Tooltips, not browser-native tooltips. The latter take too long to appear, and are too small/flat/unstyleable/plain.
+- I ≈always want @floating-ui/react Tooltips, not browser-native tooltips. The latter take too long to appear, and are too small/flat/unstyleable/plain.
 - Each project should default its dev (or built) servers to a hopefully-unique, unused port (not Vite's default 5173, slidev's 3030, http-server's 8080, etc.) to avoid conflicts when running multiple projects simultaneously on a given host.
   - A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
 - Check whether there's a server running on the desired port before starting any server and, if so, warn and prompt me.
@@ -197,7 +205,7 @@ Several tools I often use while developing other applications and libraries:
     - Manages settings in 2-3 places, including `pnpm-workspace.yaml`, that are necessary for "hot-reloading" of local dependencies to work.
   - `pds [gh|gl] <name>`: point at a recent Git{Hu,La}b "dist"-branch build
   - `pds [n|npm] <name> [version]`: point at latest published npm version
-  - `pds` stores its config state in a `.pnpm-dep-source.json` file, in each web project's root dir.
+  - `pds` stores its config state in a `.pds.json` file, in each web project's root dir.
 - [`scrns`] (https://gitlab.com/runsascoded/js/scrns): screenshot automation tool, frequently used for preview images in `README.md`s, `og:image`s, etc.
 
 [`pnpm-dep-source`]: https://www.npmjs.com/package/pnpm-dep-source
@@ -220,3 +228,14 @@ And a few libraries I often use in JS/TS apps:
 - `diff-x` ("Diff two files after running them through a pipeline of other commands"), a.k.a. `dx*`
 - `git-diff-x` ("Diff files at two commits, or one commit and the current worktree, after applying an optional command pipeline"), a.k.a. `gdx*`
 - `comm-x` ("Select or reject lines common to two input streams, after running each through a pipeline of other commands.")
+
+
+## DVX
+
+[DVX] is a fork of [DVC] that I maintain and frequently use. It mostly adds:
+- Workflow/Provenance info in each `.dvc` yaml (no project-global `pipelines.yaml`)
+- [`dvx diff`]
+
+[DVX]: https://github.com/runsascoded/dvx
+[DVC]: https://dvc.org/
+[`dvx diff`]: https://github.com/runsascoded/dvx?tab=readme-ov-file#enhanced-diff
