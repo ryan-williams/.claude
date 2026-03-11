@@ -77,7 +77,10 @@ I also use ad hoc single-capital-letter abbreviations, when it should be clear f
   - If a repo is just me, or 1-2 others, I may not bother with that, and regular `push` is fine.
 - **Commit messages**: Use backticks around code symbols (functions, variables, file names, commands, etc.) in commit messages. GitHub renders these in PR/issue titles and bodies, making it clear what refers to code.
 - **Non-interactive rebase**: Use `g rni` (`git rebase-noninteractive`) to apply rebase plans from stdin without interactive editing. Useful for scripted rewording/reordering.
-- **Worktrees**: instead of having worktrees be sibling dirs with `-$branch`-style basename suffix, I prefer to put them under an untracked `wt/` dir in the main repo root dir.
+- **Worktrees**: instead of having worktrees be sibling dirs with `-$branch`-style basename suffix, I prefer to either:
+  - put them under an untracked `wt/` dir in the main repo root dir, or
+  - if the WTs are all symmetric / there's not one that's clearly "main"/default, put a bare clone in the root repo, and have all WTs live in subdirs, named for their branch
+    - In some cases, there will be both GH and GL branches with WTs, in which case you might do a structure like `g{h,l}/{main,v1}` (e.g. in the case of `scrns`, where I have GH and GL mirrors, each with a `main` branch and `v1` reusable CI workflow orphan-branch).
 
 ### [`ghpr`] ([`ghpr-py`])
 > "Clone" GitHub PRs/issues, locally edit title/description/comments, "push" back to GitHub, and mirror to Gists.
