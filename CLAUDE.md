@@ -24,9 +24,11 @@ I use these acronyms and abbreviations:
 - **UFs** / **UTs**: UnTracked Files (Git)
 - **TP** / **FP** / **TN** / **FN**: True Positive / False Positive / True Negative / False Negative
 - **BC** = backwards-compatibility (a.k.a. back-compat). Often I'm working on code that I've not pushed anywhere, and BC concerns would only have to do with other checkpoints in my current feature branch, where BC is not important, and is even negative-value (bc it adds needless code complexity). In such cases I might just say "forget BC" or similar.
+- **DC** = double-check or double-click
 - **FFR** = For Future Reference
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
+- BP = boilerplate
 - PoLS = Principle of Least Surprise
 - AR = aspect ratio (a.k.a. "dims" for "dimensions")
 - HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless), PW = PlayWright (usual HLB library of choice), PPTR = Puppeteer (another HLB library)
@@ -34,6 +36,11 @@ I use these acronyms and abbreviations:
 - sg = sounds good
 - gt = ground truth
 - RG = regenerate
+- TFFP = Test-Fail-Fix-Pass: if I say this, I want you to:
+  1. Add a test that repros an issue (with no fix applied)
+  2. Verify the test repros the issue (with no fix applied)
+  3. Fix the issue
+  4. Verify the test now passes with the fix
 - r13y = reproducibility
 - IDP = idempotent, IDPy = idempotency.
   - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
@@ -45,6 +52,7 @@ I use these acronyms and abbreviations:
   - LS / SS = `localStorage` / `sessionStorage`
   - LM / DM = Light Mode / Dark Mode (for theming)
   - vp / vh / vw = viewport, viewport height, viewport width
+  - LIs = legend items
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 - DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 
@@ -69,6 +77,7 @@ I also use ad hoc single-capital-letter abbreviations, when it should be clear f
   - If a repo is just me, or 1-2 others, I may not bother with that, and regular `push` is fine.
 - **Commit messages**: Use backticks around code symbols (functions, variables, file names, commands, etc.) in commit messages. GitHub renders these in PR/issue titles and bodies, making it clear what refers to code.
 - **Non-interactive rebase**: Use `g rni` (`git rebase-noninteractive`) to apply rebase plans from stdin without interactive editing. Useful for scripted rewording/reordering.
+- **Worktrees**: instead of having worktrees be sibling dirs with `-$branch`-style basename suffix, I prefer to put them under an untracked `wt/` dir in the main repo root dir.
 
 ### [`ghpr`] ([`ghpr-py`])
 > "Clone" GitHub PRs/issues, locally edit title/description/comments, "push" back to GitHub, and mirror to Gists.
@@ -167,6 +176,13 @@ uv sync          # Sync dependencies
   - Log statements should go to stderr (using `err`); use stdout for primary / pipe-able / parse-able output.
   - Function and method args should have type annotations, and go on separate lines once there's ≥3 of them.
 
+## Jupyter Notebooks
+[`juq.py`] ([gh][juq gh], likely `$c/juq`) has cmds I frequently use with notebooks, especially for executing them in-place (wrapping [Papermill]), preserving indentation, normalizing std{out,err}, stripping `execution` metadata, etc. Use `juq papermill ...` instead of e.g. `jupyter nbconvert` or `papermill` directly, for better consistency and to avoid common gotchas.
+
+[`juq.py`]: https://pypi.org/project/juq-py/
+[juq gh]: https://github.com/runsascoded/juq
+[Papermill]: https://papermill.readthedocs.io
+
 ## JavaScript / TypeScript / Node.js / Web Development
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
 - I usually use Vite, TS, React, and SASS. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
@@ -228,7 +244,6 @@ And a few libraries I often use in JS/TS apps:
 - `diff-x` ("Diff two files after running them through a pipeline of other commands"), a.k.a. `dx*`
 - `git-diff-x` ("Diff files at two commits, or one commit and the current worktree, after applying an optional command pipeline"), a.k.a. `gdx*`
 - `comm-x` ("Select or reject lines common to two input streams, after running each through a pipeline of other commands.")
-
 
 ## DVX
 
