@@ -11,6 +11,8 @@
   - Write into `specs/` in the root dir of the target project.
   - In the target project:
     - Commit the initial `specs/….md` before starting to implement.
+      - The "target" project can do the committing though (not the writing project).
+      - After src project writes spec, it's easiest for me to `gs` in the dst project to find the new, untracked spec file.
     - When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
     - If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
 
@@ -29,6 +31,7 @@ I use these acronyms and abbreviations:
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
 - BP = boilerplate
+- uty = up to you
 - PoLS = Principle of Least Surprise
 - AR = aspect ratio (a.k.a. "dims" for "dimensions")
 - HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless), PW = PlayWright (usual HLB library of choice), PPTR = Puppeteer (another HLB library)
@@ -194,6 +197,7 @@ uv sync          # Sync dependencies
   - A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
 - Check whether there's a server running on the desired port before starting any server and, if so, warn and prompt me.
   - Sometimes this will be a dev server I am running in the project, meaning you don't have to boot your own.
+- Similar to Python, I like to not have module-name boilerplate inline in code, where possible, so e.g. I like a line like this up near file imports: `const { abs, floor, round } = Math`, then there's no `Math.…` boilerplate in the rest of the file.
 
 My `vite.config.ts` will usually do something like:
 
@@ -202,7 +206,7 @@ const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') ?? []
 
 export default defineConfig({
   server: {
-    port: 3201,  // ≈unique to project
+    port: 3201,  // ≈unique to project, hash project name to pick a port number in a reasonable range, use that as default
     host: true,
     allowedHosts,
   },
