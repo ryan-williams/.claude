@@ -1,4 +1,4 @@
-Push to remote, then watch the resulting CI run.
+Push to remote, then watch the resulting CI run. Works with both GitHub Actions and GitLab CI.
 
 Steps:
 1. **Push** using the same logic as the `p` phase in `/c`:
@@ -6,4 +6,4 @@ Steps:
    - If yes: `git push`
    - If no: `gpu` to push to user branch namespace
    - If the most recent commit is an amend (check if HEAD was force-pushed or user says so), use force push (`git push -f` / `gpuf`)
-2. **Watch** per `/w`: find the most recent CI run on this branch and `gh run watch` it
+2. **Watch** per `/w`: detect SCM type (GitHub/GitLab) from the remote URL, find the most recent CI run on this branch, and watch it
