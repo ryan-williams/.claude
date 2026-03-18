@@ -15,7 +15,7 @@
       - After src project writes spec, it's easiest for me to `gs` in the dst project to find the new, untracked spec file.
     - When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
     - If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
-
+- fsr, your environment seems to strip token env vars when you try to set them inline on bash commands. In order to use token env vars, you need to access them from within a script wrapper (e.g. a python script).
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations:
