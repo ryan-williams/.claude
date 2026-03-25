@@ -31,6 +31,9 @@ I use these acronyms and abbreviations:
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
 - BP = boilerplate
+- BM = benchmark
+- HS = Hammerspoon (macOS automation tool I use)
+- WA = workaround
 - uty = up to you
 - PoLS = Principle of Least Surprise
 - AR = aspect ratio (a.k.a. "dims" for "dimensions")
@@ -56,6 +59,8 @@ I use these acronyms and abbreviations:
   - LM / DM = Light Mode / Dark Mode (for theming)
   - vp / vh / vw = viewport, viewport height, viewport width
   - LIs = legend items
+  - TT = tooltip
+  - HB = Hover Box (a.k.a. Tooltip, but on plots)
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 - DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 
