@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Shorthand: bless-cmd -g (global)
+exec bless-cmd -g "$@"

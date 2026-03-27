@@ -1,21 +1,42 @@
 #!/usr/bin/env bash
-# Add a single permission to .claude/settings.local.json
+# Add a permission to Claude settings
 #
 # Usage:
-#   bless-cmd "npm run dev"        # → Bash(npm run dev:*)
-#   bless-cmd -r "npm run dev"     # Raw: adds exactly as given (no Bash wrapper)
+#   bless-cmd npm run dev            # → Bash(npm run dev:*) in project settings
+#   bless-cmd -g npm run dev         # → same, in global ~/.claude/settings.json
+#   bless-cmd -r WebFetch            # Raw: adds exactly as given (no Bash wrapper)
 
 set -euo pipefail
 
-raw=false
-if [[ "${1:-}" == "-r" ]]; then
-  raw=true
-  shift
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || $# -eq 0 ]]; then
+  echo "Usage: bless-cmd [-g] [-r] <command...>"
+  echo "  bless-cmd npm run dev        # → Bash(npm run dev:*) (project)"
+  echo "  bless-cmd -g npm run dev     # → same (global)"
+  echo "  bless-cmd -r 'WebFetch'      # Raw: adds exactly as given"
+  exit 0
 fi
 
-cmd="${1:?Usage: bless-cmd [-r] <command>}"
+raw=false
+global=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -r) raw=true; shift ;;
+    -g) global=true; shift ;;
+    *) break ;;
+  esac
+done
 
-settings=".claude/settings.local.json"
+cmd="$*"
+if [[ -z "$cmd" ]]; then
+  echo "Error: no command specified" >&2
+  exit 1
+fi
+
+if $global; then
+  settings="$HOME/.claude/settings.json"
+else
+  settings=".claude/settings.local.json"
+fi
 
 # Format permission string
 if $raw; then
@@ -26,7 +47,7 @@ fi
 
 # Create settings file if needed
 if [[ ! -f "$settings" ]]; then
-  mkdir -p .claude
+  mkdir -p "$(dirname "$settings")"
   echo '{}' > "$settings"
 fi
 
@@ -41,5 +62,7 @@ jq --arg perm "$perm" '
   .permissions.allow = ((.permissions.allow // []) + [$perm])
 ' "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
 
-echo "Added: $perm"
+label="global"
+$global || label="project"
+echo "Added ($label): $perm"
 echo "Restart Claude to apply: claude -c"
