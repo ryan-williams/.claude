@@ -71,6 +71,10 @@ I also use ad hoc single-capital-letter abbreviations, when it should be clear f
 - Similarly, **don't use `git clean -fd`** or similar; I often have untracked files/dirs that are important and I want to keep.
 - Don't `git commit` changes unless I've told you to (on a per-session basis).
 - Don't write to global `/tmp` dirs, use local/relative `tmp/...` subdirs instead.
+- I always configure a `git config --global core.excludesfile` (usually `~/git/ignore`) excluding common patterns that it's safe to assume should be ignored, anytime they appear / across all projects (e.g. `tmp`, `node_modules`, `.envrc`, …). Don't add `.gitignore` files to projects with "boilerplate" patterns like that.
+  - Only use project- or dir-specific `.gitignore` files if there are patterns that reasonably might be tracked in _some_ projects (e.g.… `docs`? IME it almost never happens).
+  - Otherwise, prefer delegating to the global `core.excludesfile`.
+  - You can also find/add to my standard list of global exclusions at `~/.rc/git/config/init-instance`.
 - If I link to or mention a GitHub Actions job / URL, read its logs (using `gh run view --log`) to understand what happened.
   - Save the logs to a local file, then read from there (so you don't have to fetch them more than once).
 - Similarly, GitLab /jobs links mean `glab ci [view|trace] ...` + save to file for analysis.
