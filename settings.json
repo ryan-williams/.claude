@@ -147,7 +147,8 @@
       "Bash(uvx pre-commit:*)",
       "Bash(uvx ruff:*)",
       "WebFetch",
-      "WebSearch"
+      "WebSearch",
+      "Bash(gws docs documents get:*)"
     ]
   },
   "enabledPlugins": {
