@@ -11,11 +11,16 @@ Reads rules from:
 
 First match wins across both files. No match = normal permission prompt.
 
+Pipelines and compound commands (|, &&, ||, ;) are split into segments;
+ALL segments must be approved for the whole command to be auto-approved.
+If any segment is denied, the whole command is denied.
+If any segment has no match, normal permission flow applies.
+
 Rule format (auto-approve.yml):
   rules:
-    - allow: '^kill \$\(lsof -ti :'
+    - allow: '^git log '
     - deny: '^rm -rf /'
-    - allow: '^npm (test|run build)'
+    - allow: '^npm (test|run build)( |$)'
 """
 
 from datetime import datetime
@@ -27,6 +32,114 @@ import sys
 import yaml
 
 LOG_FILE = Path.home() / ".claude" / "hooks" / "auto-approve.log"
+
+
+def split_shell_commands(command: str) -> list[str]:
+    """Split a shell command on unquoted |, &&, ||, ; operators.
+
+    Respects single quotes, double quotes, and $() / `` substitutions.
+    Returns the individual command segments, stripped.
+    """
+    segments = []
+    current = []
+    i = 0
+    n = len(command)
+
+    while i < n:
+        c = command[i]
+
+        # Single-quoted string: consume until closing '
+        if c == "'":
+            j = command.find("'", i + 1)
+            if j == -1:
+                current.append(command[i:])
+                i = n
+            else:
+                current.append(command[i:j + 1])
+                i = j + 1
+
+        # Double-quoted string: consume until unescaped closing "
+        elif c == '"':
+            j = i + 1
+            while j < n:
+                if command[j] == '\\' and j + 1 < n:
+                    j += 2
+                elif command[j] == '"':
+                    break
+                else:
+                    j += 1
+            current.append(command[i:j + 1])
+            i = j + 1
+
+        # $() command substitution: track nested parens
+        elif c == '$' and i + 1 < n and command[i + 1] == '(':
+            depth = 1
+            j = i + 2
+            while j < n and depth > 0:
+                if command[j] == '\\' and j + 1 < n:
+                    j += 2
+                    continue
+                if command[j] == '(':
+                    depth += 1
+                elif command[j] == ')':
+                    depth -= 1
+                j += 1
+            current.append(command[i:j])
+            i = j
+
+        # Backtick substitution
+        elif c == '`':
+            j = command.find('`', i + 1)
+            if j == -1:
+                current.append(command[i:])
+                i = n
+            else:
+                current.append(command[i:j + 1])
+                i = j + 1
+
+        # Escaped character
+        elif c == '\\' and i + 1 < n:
+            current.append(command[i:i + 2])
+            i += 2
+
+        # Shell operators: split points
+        elif c == '|' and i + 1 < n and command[i + 1] == '|':
+            # ||
+            seg = ''.join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 2
+        elif c == '|':
+            # | (pipe)
+            seg = ''.join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+        elif c == '&' and i + 1 < n and command[i + 1] == '&':
+            # &&
+            seg = ''.join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 2
+        elif c == ';':
+            seg = ''.join(current).strip()
+            if seg:
+                segments.append(seg)
+            current = []
+            i += 1
+
+        else:
+            current.append(c)
+            i += 1
+
+    seg = ''.join(current).strip()
+    if seg:
+        segments.append(seg)
+
+    return segments
 
 
 def load_rules(path: Path) -> list[dict]:
@@ -58,6 +171,33 @@ def match_rules(command: str, rules: list[dict]) -> str | None:
     return None
 
 
+def evaluate_command(command: str, rules: list[dict]) -> str | None:
+    """Evaluate a full command, splitting pipelines/compounds.
+
+    ALL segments must be 'allow' → allow.
+    ANY segment 'deny' → deny.
+    ANY segment None (no match) → None (normal prompt).
+    """
+    segments = split_shell_commands(command)
+    if not segments:
+        return None
+
+    # Single segment: evaluate directly
+    if len(segments) == 1:
+        return match_rules(segments[0], rules)
+
+    # Multiple segments: all must pass
+    has_ask = False
+    for seg in segments:
+        decision = match_rules(seg, rules)
+        if decision == "deny":
+            return "deny"
+        if decision is None:
+            has_ask = True
+
+    return None if has_ask else "allow"
+
+
 def main():
     hook_input = json.load(sys.stdin)
     command = hook_input.get("tool_input", {}).get("command", "")
@@ -71,12 +211,13 @@ def main():
         all_rules.extend(load_rules(Path(project_dir) / ".claude" / "hooks" / "auto-approve.yml"))
     all_rules.extend(load_rules(Path.home() / ".claude" / "hooks" / "auto-approve.yml"))
 
-    decision = match_rules(command, all_rules)
+    decision = evaluate_command(command, all_rules)
 
     # Log decision
     try:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        proj = project_dir or "-"
+        home = str(Path.home())
+        proj = project_dir.replace(home, "~") if project_dir else "-"
         label = decision or "ask"
         cmd_short = command[:120]
         with open(LOG_FILE, "a") as f:
