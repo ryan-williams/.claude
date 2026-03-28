@@ -1,0 +1,64 @@
+# Auto-approve rules for Bash commands.
+# First match wins. No match = normal permission prompt.
+# Use [$] and [(] instead of \$ and \( to avoid Python regex warnings.
+
+rules:
+  # ── Git (read-only) ─────────────────────────────────────────────
+  # Covers both `git <cmd>` and `git -C <path> <cmd>`
+  - allow: '^git( -C [^ ]+)? (branch|cat-file|check-ignore|diff|diff-x|fetch|log|ls-files|ls-tree|merge-base|reflog|remote|rev-list|rev-parse|show|stash list|status|tag)( |$)'
+
+  # ── GitHub / GitLab CLI (read-only) ────────────────────────────
+  - allow: '^gh (issue|pr|release|repo|run|search|workflow) (list|view|checks|download|watch)( |$)'
+  - allow: '^gh api '
+  - allow: '^glab ci (list|view|trace|status)( |$)'
+
+  # ── Shell read-only / inspection ───────────────────────────────
+  - allow: '^(cat|col|df|dig|du|echo|env|ffprobe|file|grep|gzip|gunzip|head|hexdump|jq|ls|lsof|pdfinfo|pgrep|printf|ps|readlink|rg|sips|stat|tail|tar|tee|test|tree|wc|which|xq|xxd|yq|zip)( |$)'
+  - allow: '^/usr/bin/(col|stat)( |$)'
+  - allow: '^\[( |$)'
+
+  # ── Python ─────────────────────────────────────────────────────
+  - allow: '^(pytest|python -m pytest|ruff|uvx pre-commit|uvx ruff)( |$)'
+  - allow: '^(pip install|pip show|pip index|pipx list|uv sync|uv tree)( |$)'
+
+  # ── Node / pnpm ───────────────────────────────────────────────
+  - allow: '^pnpm (add|approve-builds|audit|build|bundle|clean|dev|install|lint|list|ls|outdated|run|search|start|test|tsc|typecheck|vitest|why)( |$)'
+  - allow: '^pnpm exec (playwright|tsc)( |$)'
+  - allow: '^npm (run build|run test|search|test|view)( |$)'
+  - allow: '^npx (playwright|vitest)( |$)'
+
+  # ── Cargo / Rust ───────────────────────────────────────────────
+  - allow: '^cargo (build|check|clippy|doc|install|metadata|search|test|tree)( |$)'
+  - allow: '^wasm-pack build( |$)'
+
+  # ── AWS (read-only) ───────────────────────────────────────────
+  - allow: '^aws (s3 ls|s3api get-bucket-cors|s3api get-bucket-policy|s3api get-public-access-block|sts get-caller-identity)( |$)'
+
+  # ── Other tools ────────────────────────────────────────────────
+  - allow: '^(brew|chmod|diff-x|diskutil (info|list)|dvx status|ffmpeg|gs|ln -s|magick|mkdir -p|pandoc|pdfseparate|sed -n|yes)( |$)'
+  - allow: '^curl (-s )?https?://localhost[:/]'
+
+  # ── macOS ───────────────────────────────────────────────────────
+  - allow: '^defaults read( |$)'
+
+  # ── Project helpers ────────────────────────────────────────────
+  - allow: '^(pqa|pqn|pqs|pqm)( |$)'
+  - allow: '^gws docs documents get( |$)'
+  - allow: '^gh (run rerun|workflow run)( |$)'
+  - allow: '^(pds|pds init|pds l|pds ls|pds gh|pds status|pds --help|pds set --help)( |$)'
+  - allow: '^(dvx status|dvx diff|dvx --help|dvx version|dvx run|dvx add|dvx import-url)( |$)'
+  - allow: '^(mdcmd|mktoc|scrns|git-didi|git-diff-x|juq|bmdf --help)( |$)'
+  - allow: '^(ghpr shell-integration)( |$)'
+
+  # ── Additional read-only / safe commands ───────────────────────
+  - allow: '^(find|sort|awk|xargs|unzip|md5|identify|sqlite3|node -e|open)( |$)'
+  - allow: '^(python3?|python -c|node)( |$)'
+  - allow: '^(git show-ref|git stash|git config|git mv|git init|git clone)( |$)'
+  - allow: '^(uv (run|add|lock|build|pip install|pip))( |$)'
+  - allow: '^(npx (tsc|tsx|eslint|vite|scrns))( |$)'
+  - allow: '^(pipx (install|inject))( |$)'
+  - allow: '^(pnpm (remove|update|rebuild|create|config|scrns))( |$)'
+  - allow: '^(npm (run|install))( |$)'
+  - allow: '^(glab api)( |$)'
+  - allow: '^aws (logs |ec2 describe-)'
+  - allow: '^gh (gist list|release)( |$)'

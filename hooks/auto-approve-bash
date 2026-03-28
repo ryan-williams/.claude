@@ -1,0 +1,102 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pyyaml"]
+# ///
+r"""Auto-approve (or deny) Bash commands based on regex rules in YAML specs.
+
+Reads rules from:
+  1. $CLAUDE_PROJECT_DIR/.claude/hooks/auto-approve.yml (project, checked first)
+  2. ~/.claude/hooks/auto-approve.yml (global, fallback)
+
+First match wins across both files. No match = normal permission prompt.
+
+Rule format (auto-approve.yml):
+  rules:
+    - allow: '^kill \$\(lsof -ti :'
+    - deny: '^rm -rf /'
+    - allow: '^npm (test|run build)'
+"""
+
+from datetime import datetime
+from pathlib import Path
+import json
+import os
+import re
+import sys
+import yaml
+
+LOG_FILE = Path.home() / ".claude" / "hooks" / "auto-approve.log"
+
+
+def load_rules(path: Path) -> list[dict]:
+    """Load rules from a YAML spec file."""
+    if not path.is_file():
+        return []
+    try:
+        data = yaml.safe_load(path.read_text())
+        return data.get("rules", []) if isinstance(data, dict) else []
+    except Exception as e:
+        print(f"Warning: failed to parse {path}: {e}", file=sys.stderr)
+        return []
+
+
+def match_rules(command: str, rules: list[dict]) -> str | None:
+    """Evaluate rules against a command. Returns 'allow', 'deny', or None."""
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        for action in ("allow", "deny"):
+            pattern = rule.get(action)
+            if pattern is None:
+                continue
+            try:
+                if re.search(pattern, command):
+                    return action
+            except re.error as e:
+                print(f"Warning: bad regex {pattern!r}: {e}", file=sys.stderr)
+    return None
+
+
+def main():
+    hook_input = json.load(sys.stdin)
+    command = hook_input.get("tool_input", {}).get("command", "")
+    if not command:
+        return
+
+    # Collect rules: project-specific first, then global
+    all_rules = []
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
+    if project_dir:
+        all_rules.extend(load_rules(Path(project_dir) / ".claude" / "hooks" / "auto-approve.yml"))
+    all_rules.extend(load_rules(Path.home() / ".claude" / "hooks" / "auto-approve.yml"))
+
+    decision = match_rules(command, all_rules)
+
+    # Log decision
+    try:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        proj = project_dir or "-"
+        label = decision or "ask"
+        cmd_short = command[:120]
+        with open(LOG_FILE, "a") as f:
+            f.write(f"{ts}  {label:5s}  {proj}  {cmd_short}\n")
+    except Exception:
+        pass
+
+    if decision is None:
+        return  # No match: normal permission flow
+
+    result = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": decision,
+        }
+    }
+    if decision == "deny":
+        result["hookSpecificOutput"]["permissionDecisionReason"] = "Denied by auto-approve hook"
+    json.dump(result, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()
