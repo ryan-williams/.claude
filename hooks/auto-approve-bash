@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["pyyaml"]
 # ///
-r"""Auto-approve (or deny) Bash commands based on regex rules in YAML specs.
+r"""Auto-approve (or deny) Bash commands based on rules in YAML specs.
 
 Reads rules from:
   1. $CLAUDE_PROJECT_DIR/.claude/hooks/auto-approve.yml (project, checked first)
@@ -13,14 +13,19 @@ First match wins across both files. No match = normal permission prompt.
 
 Pipelines and compound commands (|, &&, ||, ;) are split into segments;
 ALL segments must be approved for the whole command to be auto-approved.
-If any segment is denied, the whole command is denied.
-If any segment has no match, normal permission flow applies.
 
-Rule format (auto-approve.yml):
-  rules:
-    - allow: '^git log '
-    - deny: '^rm -rf /'
-    - allow: '^npm (test|run build)( |$)'
+Rule types:
+  allow: / deny:         Shlex-aware token matching (recommended)
+  allow-regex: / deny-regex:   Raw regex on command string (fallback)
+
+Token pattern syntax:
+  Bare word     Literal match against one shlex token
+  *             Any single token
+  (a|b|c)       Alternation of literals
+  "text *"      One token matching glob (shlex-parsed, * = .*)
+  $             End anchor: no extra trailing args allowed
+
+Prefix matching by default: extra args after the pattern are OK.
 """
 
 from datetime import datetime
@@ -28,119 +33,247 @@ from pathlib import Path
 import json
 import os
 import re
+import shlex
 import sys
 import yaml
 
 LOG_FILE = Path.home() / ".claude" / "hooks" / "auto-approve.log"
 
 
+# ── Token matchers ───────────────────────────────────────────────
+
+class Literal:
+    __slots__ = ("text",)
+    def __init__(self, text):
+        self.text = text
+    def matches(self, token):
+        return token == self.text
+
+class AnyToken:
+    def matches(self, _token):
+        return True
+
+class Alternation:
+    __slots__ = ("options",)
+    def __init__(self, options):
+        self.options = frozenset(options)
+    def matches(self, token):
+        return token in self.options
+
+class GlobPattern:
+    """Matches one token against a glob pattern (* = .*)."""
+    __slots__ = ("regex",)
+    def __init__(self, pattern):
+        escaped = re.escape(pattern).replace(r"\*", ".*")
+        self.regex = re.compile(f"^{escaped}$")
+    def matches(self, token):
+        return bool(self.regex.match(token))
+
+
+# Sentinel for end-of-pattern anchor
+END_ANCHOR = object()
+
+
+def parse_pattern(pattern_str: str) -> list:
+    """Parse a pattern string into a list of token matchers."""
+    matchers = []
+    i = 0
+    n = len(pattern_str)
+
+    while i < n:
+        # Skip whitespace
+        while i < n and pattern_str[i] == " ":
+            i += 1
+        if i >= n:
+            break
+
+        c = pattern_str[i]
+
+        # End anchor
+        if c == "$" and i == n - 1:
+            matchers.append(END_ANCHOR)
+            i += 1
+
+        # Alternation: (a|b|c)
+        elif c == "(":
+            j = pattern_str.find(")", i + 1)
+            if j == -1:
+                # Malformed, treat rest as literal
+                matchers.append(Literal(pattern_str[i:]))
+                break
+            options = pattern_str[i + 1 : j].split("|")
+            matchers.append(Alternation(options))
+            i = j + 1
+
+        # Quoted string (may contain wildcards)
+        elif c in ('"', "'"):
+            quote = c
+            j = i + 1
+            while j < n and pattern_str[j] != quote:
+                if pattern_str[j] == "\\" and j + 1 < n:
+                    j += 2
+                else:
+                    j += 1
+            inner = pattern_str[i + 1 : j]
+            if "*" in inner:
+                matchers.append(GlobPattern(inner))
+            else:
+                matchers.append(Literal(inner))
+            i = j + 1
+
+        # Bare token
+        else:
+            j = i
+            while j < n and pattern_str[j] != " ":
+                j += 1
+            token = pattern_str[i:j]
+            if token == "*":
+                matchers.append(AnyToken())
+            elif "*" in token:
+                matchers.append(GlobPattern(token))
+            else:
+                matchers.append(Literal(token))
+            i = j
+
+    return matchers
+
+
+def match_tokens(matchers: list, tokens: list[str]) -> bool:
+    """Match parsed matchers against shlex-parsed tokens.
+
+    Prefix matching by default. END_ANCHOR requires exact length.
+    """
+    exact = matchers and matchers[-1] is END_ANCHOR
+    if exact:
+        matchers = matchers[:-1]
+
+    if len(tokens) < len(matchers):
+        return False
+    if exact and len(tokens) != len(matchers):
+        return False
+
+    for matcher, token in zip(matchers, tokens):
+        if not matcher.matches(token):
+            return False
+    return True
+
+
+def shlex_split_safe(command: str) -> list[str] | None:
+    """shlex.split with fallback for malformed input."""
+    try:
+        return shlex.split(command)
+    except ValueError:
+        return None
+
+
+# ── Shell pipeline splitting ─────────────────────────────────────
+
 def split_shell_commands(command: str) -> list[str]:
     """Split a shell command on unquoted |, &&, ||, ; operators.
 
-    Respects single quotes, double quotes, and $() / `` substitutions.
-    Returns the individual command segments, stripped.
+    Respects single quotes, double quotes, $() / `` substitutions,
+    and backslash escapes.
     """
     segments = []
-    current = []
+    current: list[str] = []
     i = 0
     n = len(command)
 
     while i < n:
         c = command[i]
 
-        # Single-quoted string: consume until closing '
         if c == "'":
             j = command.find("'", i + 1)
             if j == -1:
                 current.append(command[i:])
                 i = n
             else:
-                current.append(command[i:j + 1])
+                current.append(command[i : j + 1])
                 i = j + 1
-
-        # Double-quoted string: consume until unescaped closing "
         elif c == '"':
             j = i + 1
             while j < n:
-                if command[j] == '\\' and j + 1 < n:
+                if command[j] == "\\" and j + 1 < n:
                     j += 2
                 elif command[j] == '"':
                     break
                 else:
                     j += 1
-            current.append(command[i:j + 1])
+            current.append(command[i : j + 1])
             i = j + 1
-
-        # $() command substitution: track nested parens
-        elif c == '$' and i + 1 < n and command[i + 1] == '(':
+        elif c == "$" and i + 1 < n and command[i + 1] == "(":
             depth = 1
             j = i + 2
             while j < n and depth > 0:
-                if command[j] == '\\' and j + 1 < n:
+                if command[j] == "\\" and j + 1 < n:
                     j += 2
                     continue
-                if command[j] == '(':
+                if command[j] == "(":
                     depth += 1
-                elif command[j] == ')':
+                elif command[j] == ")":
                     depth -= 1
                 j += 1
             current.append(command[i:j])
             i = j
-
-        # Backtick substitution
-        elif c == '`':
-            j = command.find('`', i + 1)
+        elif c == "`":
+            j = command.find("`", i + 1)
             if j == -1:
                 current.append(command[i:])
                 i = n
             else:
-                current.append(command[i:j + 1])
+                current.append(command[i : j + 1])
                 i = j + 1
-
-        # Escaped character
-        elif c == '\\' and i + 1 < n:
-            current.append(command[i:i + 2])
+        elif c == "\\" and i + 1 < n:
+            current.append(command[i : i + 2])
             i += 2
-
-        # Shell operators: split points
-        elif c == '|' and i + 1 < n and command[i + 1] == '|':
-            # ||
-            seg = ''.join(current).strip()
+        elif c == "|" and i + 1 < n and command[i + 1] == "|":
+            seg = "".join(current).strip()
             if seg:
                 segments.append(seg)
             current = []
             i += 2
-        elif c == '|':
-            # | (pipe)
-            seg = ''.join(current).strip()
+        elif c == "|":
+            seg = "".join(current).strip()
             if seg:
                 segments.append(seg)
             current = []
             i += 1
-        elif c == '&' and i + 1 < n and command[i + 1] == '&':
-            # &&
-            seg = ''.join(current).strip()
+        elif c == "&" and i + 1 < n and command[i + 1] == "&":
+            seg = "".join(current).strip()
             if seg:
                 segments.append(seg)
             current = []
             i += 2
-        elif c == ';':
-            seg = ''.join(current).strip()
+        elif c == "&":
+            # Check for redirect: N>& or >& (not a pipeline operator)
+            cur_str = "".join(current)
+            if cur_str and cur_str[-1] == ">" or (len(cur_str) >= 2 and cur_str[-2].isdigit() and cur_str[-1] == ">"):
+                current.append(c)
+                i += 1
+            else:
+                # Background operator: split here
+                seg = cur_str.strip()
+                if seg:
+                    segments.append(seg)
+                current = []
+                i += 1
+        elif c == ";":
+            seg = "".join(current).strip()
             if seg:
                 segments.append(seg)
             current = []
             i += 1
-
         else:
             current.append(c)
             i += 1
 
-    seg = ''.join(current).strip()
+    seg = "".join(current).strip()
     if seg:
         segments.append(seg)
-
     return segments
 
+
+# ── Rule loading and matching ────────────────────────────────────
 
 def load_rules(path: Path) -> list[dict]:
     """Load rules from a YAML spec file."""
@@ -155,19 +288,41 @@ def load_rules(path: Path) -> list[dict]:
 
 
 def match_rules(command: str, rules: list[dict]) -> str | None:
-    """Evaluate rules against a command. Returns 'allow', 'deny', or None."""
+    """Evaluate rules against a single command segment.
+
+    Returns 'allow', 'deny', or None.
+    """
+    tokens = shlex_split_safe(command)
+
     for rule in rules:
         if not isinstance(rule, dict):
             continue
-        for action in ("allow", "deny"):
-            pattern = rule.get(action)
+
+        for action_key in ("allow", "deny", "allow-regex", "deny-regex"):
+            pattern = rule.get(action_key)
             if pattern is None:
                 continue
-            try:
-                if re.search(pattern, command):
-                    return action
-            except re.error as e:
-                print(f"Warning: bad regex {pattern!r}: {e}", file=sys.stderr)
+
+            action = action_key.split("-")[0]  # "allow" or "deny"
+
+            if action_key.endswith("-regex"):
+                # Raw regex match on command string
+                try:
+                    if re.search(pattern, command):
+                        return action
+                except re.error as e:
+                    print(f"Warning: bad regex {pattern!r}: {e}", file=sys.stderr)
+            else:
+                # Shlex-aware token matching
+                if tokens is None:
+                    continue
+                try:
+                    matchers = parse_pattern(pattern)
+                    if match_tokens(matchers, tokens):
+                        return action
+                except Exception as e:
+                    print(f"Warning: bad pattern {pattern!r}: {e}", file=sys.stderr)
+
     return None
 
 
@@ -182,11 +337,9 @@ def evaluate_command(command: str, rules: list[dict]) -> str | None:
     if not segments:
         return None
 
-    # Single segment: evaluate directly
     if len(segments) == 1:
         return match_rules(segments[0], rules)
 
-    # Multiple segments: all must pass
     has_ask = False
     for seg in segments:
         decision = match_rules(seg, rules)
@@ -198,22 +351,25 @@ def evaluate_command(command: str, rules: list[dict]) -> str | None:
     return None if has_ask else "allow"
 
 
+# ── Main ─────────────────────────────────────────────────────────
+
 def main():
     hook_input = json.load(sys.stdin)
     command = hook_input.get("tool_input", {}).get("command", "")
     if not command:
         return
 
-    # Collect rules: project-specific first, then global
     all_rules = []
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
     if project_dir:
-        all_rules.extend(load_rules(Path(project_dir) / ".claude" / "hooks" / "auto-approve.yml"))
+        all_rules.extend(
+            load_rules(Path(project_dir) / ".claude" / "hooks" / "auto-approve.yml")
+        )
     all_rules.extend(load_rules(Path.home() / ".claude" / "hooks" / "auto-approve.yml"))
 
     decision = evaluate_command(command, all_rules)
 
-    # Log decision
+    # Log
     try:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         home = str(Path.home())
@@ -226,7 +382,7 @@ def main():
         pass
 
     if decision is None:
-        return  # No match: normal permission flow
+        return
 
     result = {
         "hookSpecificOutput": {
@@ -235,7 +391,9 @@ def main():
         }
     }
     if decision == "deny":
-        result["hookSpecificOutput"]["permissionDecisionReason"] = "Denied by auto-approve hook"
+        result["hookSpecificOutput"]["permissionDecisionReason"] = (
+            "Denied by auto-approve hook"
+        )
     json.dump(result, sys.stdout)
 
 
