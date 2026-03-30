@@ -11,11 +11,11 @@ Reads rules from:
 
 First match wins across both files. No match = normal permission prompt.
 
-Pipelines and compound commands (|, &&, ||, ;) are split into segments;
-ALL segments must be approved for the whole command to be auto-approved.
+Pipelines and compound commands (|, &&, ||, ;, \n) are split into
+segments; ALL segments must be approved for the whole command to pass.
 
 Rule types:
-  allow: / deny:         Shlex-aware token matching (recommended)
+  allow: / deny:               Shlex-aware token matching (recommended)
   allow-regex: / deny-regex:   Raw regex on command string (fallback)
 
 Token pattern syntax:
@@ -26,6 +26,45 @@ Token pattern syntax:
   $             End anchor: no extra trailing args allowed
 
 Prefix matching by default: extra args after the pattern are OK.
+
+Safety / FP analysis
+--------------------
+The architecture is designed so that false positives (auto-approving
+something unsafe) require MULTIPLE failures to align:
+
+1. Pipeline splitting runs FIRST on the raw command string, splitting on
+   unquoted |, &&, ||, ;, &, \n. Each resulting segment is evaluated
+   independently. ALL must be 'allow' for the command to pass.
+
+2. Each segment is matched against rules using shlex-parsed tokens (not
+   raw string matching). Prefix matching means "the command starts with
+   these tokens" — extra trailing args are OK but cannot change the base
+   command identity.
+
+FP can only occur if:
+  - The pipeline splitter FAILS to split on a real command separator,
+    causing two commands to be evaluated as one. The first command
+    matches a rule, so the combined string is approved, but the second
+    command (which wouldn't match) also executes.
+  - This requires a separator char that bash interprets but our splitter
+    doesn't recognize. Known gaps:
+      * ANSI-C quoting: $'\x3b' (literal ;) — not split
+      * Process substitution: <(cmd), >(cmd) — not parsed
+      * Brace groups: { cmd1; cmd2; } — inner ; not split
+      * Subshells: (cmd1; cmd2) — inner ; not split
+    These are rare in Claude-generated commands.
+  - OR a rule pattern is overly broad. Each rule should include enough
+    specificity (flags, subcommands) to constrain the match. E.g., a
+    rule 'allow: rm' would approve 'rm -rf /' — always include the
+    flags: 'allow: rm -rf (node_modules|dist|...)'.
+
+Known limitations (cause false negatives → manual prompt, NOT FPs):
+  - shlex.split() doesn't understand $() — commands with command
+    substitution need allow-regex: instead of allow:
+  - Heredocs (<<EOF) not handled — treated as regular text
+  - Complex nested compounds may not reassemble correctly
+  - Line continuations (\<newline>) are handled, but other obscure
+    bash quoting ($'...' ANSI-C strings) is not
 """
 
 from datetime import datetime
@@ -279,8 +318,12 @@ def split_shell_commands(command: str) -> list[str]:
                 current.append(command[i : j + 1])
                 i = j + 1
         elif c == "\\" and i + 1 < n:
-            current.append(command[i : i + 2])
-            i += 2
+            if command[i + 1] == "\n":
+                # Line continuation: skip both \ and \n
+                i += 2
+            else:
+                current.append(command[i : i + 2])
+                i += 2
         elif c == "|" and i + 1 < n and command[i + 1] == "|":
             seg = "".join(current).strip()
             if seg:
@@ -312,7 +355,7 @@ def split_shell_commands(command: str) -> list[str]:
                     segments.append(seg)
                 current = []
                 i += 1
-        elif c == ";":
+        elif c in (";", "\n"):
             seg = "".join(current).strip()
             if seg:
                 segments.append(seg)
@@ -346,17 +389,28 @@ def _unwrap_assignment(command: str) -> str:
     """Unwrap variable assignments to get the actual command.
 
     'VAR=$(cmd args)' → 'cmd args'
-    'VAR=value' → '' (no command)
+    'export VAR=$(cmd)' → 'cmd'
+    'local VAR=value' → '' (no command)
+    'VAR=value cmd args' → 'cmd args' (env prefix)
     'cmd args' → 'cmd args' (unchanged)
     """
+    cmd = command
+    # Strip export/local/declare/readonly prefix
+    m = re.match(r'^(export|local|declare|readonly|typeset)\s+', cmd)
+    if m:
+        cmd = cmd[m.end():]
     # Match VAR=...$(...) or VAR=$(...) patterns
-    m = re.match(r'^[A-Za-z_]\w*=\$\((.+)\)\s*$', command)
+    m = re.match(r'^[A-Za-z_]\w*=\$\((.+)\)\s*$', cmd)
     if m:
         return m.group(1)
     # Plain assignment: VAR=value (no command to evaluate)
-    if re.match(r'^[A-Za-z_]\w*=', command):
+    if re.match(r'^[A-Za-z_]\w*=\S*\s*$', cmd):
         return ""
-    return command
+    # Env-prefix pattern: VAR=value cmd args → evaluate 'cmd args'
+    m = re.match(r'^[A-Za-z_]\w*=\S*\s+(.+)$', cmd)
+    if m:
+        return m.group(1)
+    return cmd
 
 
 def match_rules(command: str, rules: list[dict]) -> str | None:
@@ -454,6 +508,8 @@ def evaluate_command(command: str, rules: list[dict]) -> str | None:
     body commands are evaluated individually.
     """
     segments = split_shell_commands(command)
+    # Filter out comments and empty segments
+    segments = [s for s in segments if s and not s.lstrip().startswith("#")]
     if not segments:
         return None
 

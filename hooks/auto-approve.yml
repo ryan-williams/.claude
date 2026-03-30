@@ -24,7 +24,7 @@ rules:
   - allow: glab (api|ci)
 
   # ── Shell read-only / inspection ───────────────────────────────
-  - allow: (awk|bc|cat|col|cut|df|dig|du|echo|env|ffprobe|file|find|grep|gzip|gunzip|head|hexdump|identify|jq|ls|lsof|md5|pdfinfo|pgrep|printf|ps|readlink|rg|sed|sips|sleep|sort|sqlite3|stat|tail|tar|tee|test|tr|tree|unzip|wc|which|xargs|xq|xxd|yq|zip)
+  - allow: (awk|bc|cat|col|cut|df|dig|du|echo|env|ffprobe|file|find|grep|gzip|gunzip|head|hexdump|identify|jq|ls|lsof|md5|pdfinfo|pgrep|printf|ps|readlink|rg|sed|sips|sleep|sort|sqlite3|stat|tail|tar|tee|test|touch|tr|tree|uniq|unzip|wc|which|xargs|xq|xxd|yq|zip)
   - allow: /usr/bin/(col|stat)
   - allow: "["
 
