@@ -18,7 +18,21 @@ Rule types:
   allow: / deny:               Shlex-aware token matching (recommended)
   allow-regex: / deny-regex:   Raw regex on command string (fallback)
 
-Token pattern syntax:
+Rule value formats:
+  String    Single pattern: 'allow: git log'
+  List      Each item is a standalone pattern:
+              allow:
+                - cat
+                - head
+                - tail
+  Dict      Trie: keys are prefix patterns, values are lists of
+            allowed next tokens (or nested dicts for deeper nesting):
+              allow:
+                git: [branch, diff, log, status]
+                git -C *: [branch, diff, log, status]
+                pnpm: [add, build, test]
+
+Token pattern syntax (within strings):
   Bare word     Literal match against one shlex token
   *             Any single token
   (a|b|c)       Alternation of literals
@@ -413,10 +427,48 @@ def _unwrap_assignment(command: str) -> str:
     return cmd
 
 
+def _match_trie(tokens: list[str], trie: dict) -> bool:
+    """Match tokens against a trie (dict) structure.
+
+    Keys are pattern prefixes (parsed with parse_pattern).
+    Values can be:
+      - list of strings: allowed next tokens (any matches → allow)
+      - dict: recurse deeper
+      - null/true: match here (prefix match, trailing args OK)
+    """
+    for prefix_str, subtree in trie.items():
+        prefix_matchers = parse_pattern(prefix_str)
+        if len(tokens) < len(prefix_matchers):
+            continue
+        # Check prefix matches
+        if not all(m.matches(t) for m, t in zip(prefix_matchers, tokens)):
+            continue
+        remaining = tokens[len(prefix_matchers):]
+
+        if subtree is None or subtree is True:
+            return True
+        elif isinstance(subtree, list):
+            # List of allowed next tokens
+            if not remaining:
+                return True  # No next token needed
+            alternation = Alternation(subtree)
+            if alternation.matches(remaining[0]):
+                return True
+        elif isinstance(subtree, dict):
+            if _match_trie(remaining, subtree):
+                return True
+    return False
+
+
 def match_rules(command: str, rules: list[dict]) -> str | None:
     """Evaluate rules against a single command segment.
 
     Returns 'allow', 'deny', or None.
+
+    Pattern value types:
+      str  → single pattern (parsed with parse_pattern)
+      list → each item is a standalone pattern string
+      dict → trie: keys are prefixes, values are lists/dicts/null
     """
     # Unwrap variable assignments
     command = _unwrap_assignment(command)
@@ -443,12 +495,32 @@ def match_rules(command: str, rules: list[dict]) -> str | None:
                         return action
                 except re.error as e:
                     print(f"Warning: bad regex {pattern!r}: {e}", file=sys.stderr)
-            else:
-                # Shlex-aware token matching
+            elif isinstance(pattern, list):
+                # List of patterns: each is a standalone pattern string
+                if tokens is None:
+                    continue
+                for pat in pattern:
+                    try:
+                        matchers = parse_pattern(str(pat))
+                        if match_tokens(matchers, tokens):
+                            return action
+                    except Exception as e:
+                        print(f"Warning: bad pattern {pat!r}: {e}", file=sys.stderr)
+            elif isinstance(pattern, dict):
+                # Trie: keys are prefixes, values are subtrees
                 if tokens is None:
                     continue
                 try:
-                    matchers = parse_pattern(pattern)
+                    if _match_trie(tokens, pattern):
+                        return action
+                except Exception as e:
+                    print(f"Warning: bad trie pattern: {e}", file=sys.stderr)
+            else:
+                # String: single pattern
+                if tokens is None:
+                    continue
+                try:
+                    matchers = parse_pattern(str(pattern))
                     if match_tokens(matchers, tokens):
                         return action
                 except Exception as e:

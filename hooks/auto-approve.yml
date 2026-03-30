@@ -1,7 +1,12 @@
 # Auto-approve rules for Bash commands.
 # First match wins. No match = normal permission prompt.
 #
-# Pattern syntax (shlex-aware, prefix match by default):
+# Rule value formats:
+#   string          single pattern (shlex-aware, prefix match by default)
+#   list            each item is a standalone pattern string
+#   dict (trie)     keys are prefix patterns, values are lists of allowed next tokens (or nested dicts)
+#
+# Pattern syntax (within strings):
 #   word        literal token match
 #   *           any single token
 #   (a|b|c)     alternation
@@ -12,66 +17,216 @@
 
 rules:
   # ── Git (read-only) ─────────────────────────────────────────────
-  - allow: git (branch|cat-file|check-ignore|diff|diff-x|fetch|log|ls-files|ls-tree|merge-base|reflog|remote|rev-list|rev-parse|show|show-ref|stash|status|tag)
-  - allow: git -C * (branch|cat-file|check-ignore|diff|diff-x|fetch|log|ls-files|ls-tree|merge-base|reflog|remote|rev-list|rev-parse|show|show-ref|stash|status|tag)
-  - allow: git (clone|config|init|mv)
+  - allow:
+      git:
+        - branch
+        - cat-file
+        - check-ignore
+        - clone
+        - config
+        - diff
+        - diff-x
+        - fetch
+        - init
+        - log
+        - ls-files
+        - ls-tree
+        - merge-base
+        - mv
+        - reflog
+        - remote
+        - rev-list
+        - rev-parse
+        - show
+        - show-ref
+        - stash
+        - status
+        - tag
+      git -C *:
+        - branch
+        - cat-file
+        - check-ignore
+        - diff
+        - diff-x
+        - fetch
+        - log
+        - ls-files
+        - ls-tree
+        - merge-base
+        - reflog
+        - remote
+        - rev-list
+        - rev-parse
+        - show
+        - show-ref
+        - stash
+        - status
+        - tag
 
-  # ── GitHub / GitLab CLI (read-only) ────────────────────────────
-  - allow: gh (issue|pr|release|repo|run|search|workflow) (list|view|checks|download|watch)
-  - allow: gh api
-  - allow: gh (gist|release) (list|view|edit)
-  - allow: gh (run|workflow) (rerun|run)
-  - allow: glab (api|ci)
+  # ── GitHub / GitLab CLI ────────────────────────────────────────
+  - deny-regex: '^gh api .*(-X |--method )'
+  - allow:
+      gh api: ~
+      gh issue: [list, view]
+      gh pr: [checks, list, view]
+      gh release: [edit, list, view]
+      gh repo: [list, view]
+      gh run: [download, list, rerun, view, watch]
+      gh search: ~
+      gh workflow: [list, run]
+      gh gist: [list, view]
+      glab: [api, ci]
 
   # ── Shell read-only / inspection ───────────────────────────────
-  - allow: (awk|bc|cat|col|cut|df|dig|du|echo|env|ffprobe|file|find|grep|gzip|gunzip|head|hexdump|identify|jq|ls|lsof|md5|pdfinfo|pgrep|printf|ps|readlink|rg|sed|sips|sleep|sort|sqlite3|stat|tail|tar|tee|test|touch|tr|tree|uniq|unzip|wc|which|xargs|xq|xxd|yq|zip)
+  - allow:
+    - alias
+    - awk
+    - bc
+    - cat
+    - cd
+    - col
+    - cut
+    - df
+    - dig
+    - du
+    - echo
+    - env
+    - ffprobe
+    - file
+    - find
+    - grep
+    - gzip
+    - gunzip
+    - head
+    - hexdump
+    - identify
+    - jq
+    - ls
+    - lsof
+    - md5
+    - pdfinfo
+    - pgrep
+    - printf
+    - ps
+    - readlink
+    - rg
+    - sed
+    - sips
+    - sleep
+    - sort
+    - sqlite3
+    - stat
+    - tail
+    - tar
+    - tee
+    - test
+    - touch
+    - tr
+    - tree
+    - type
+    - uniq
+    - unzip
+    - wc
+    - which
+    - xargs
+    - xq
+    - xxd
+    - yq
+    - zip
   - allow: /usr/bin/(col|stat)
   - allow: "["
 
   # ── macOS ───────────────────────────────────────────────────────
   - allow: defaults read
   - allow: /usr/libexec/PlistBuddy -c "Print *"
-  - allow: (diskutil|open|sips)
+  - allow:
+    - diskutil
+    - open
 
   # ── Python ─────────────────────────────────────────────────────
-  - allow: (python|python3|python3.*)
-  - allow: python -c
-  - allow: (pytest|ruff)
-  - allow: python -m pytest
-  - allow: (pip|uv) (install|show|index)
-  - allow: pip (download|uninstall)
-  - allow: pipx (install|inject|list)
-  - allow: uv (sync|tree|add|lock|build|run|pip)
-  - allow: uvx (pre-commit|ruff)
+  - allow:
+    - python
+    - python3
+    - "python3.*"
+    - python -c
+    - python -m pytest
+    - pytest
+    - ruff
+  - allow:
+      pip: [download, index, install, show, uninstall]
+      pipx: [inject, install, list]
+      uv: [add, build, lock, pip, run, sync, tree]
+      uvx: [pre-commit, ruff]
 
   # ── Build artifact / temp cleanup ────────────────────────────
-  - allow: rm -rf (node_modules/.vite|node_modules/.cache|dist|build|.next|.nuxt|__pycache__|.pytest_cache|target/debug|target/release)
-  - allow: rm -rf node_modules
+  - allow:
+      rm -rf:
+        - node_modules/.vite
+        - node_modules/.cache
+        - node_modules
+        - dist
+        - build
+        - .next
+        - .nuxt
+        - __pycache__
+        - .pytest_cache
+        - target/debug
+        - target/release
   - allow: rm -rf "/tmp/*"
-  - allow: cd
 
   # ── Node / pnpm ───────────────────────────────────────────────
-  - allow: (node|node -e)
-  - allow: pnpm (add|approve-builds|audit|build|bundle|clean|config|create|dev|install|lint|list|ls|outdated|rebuild|remove|run|search|start|test|tsc|typecheck|update|vitest|why)
-  - allow: pnpm exec (playwright|tsc)
-  - allow: pnpm (scrns|tc)
-  - allow: npm (install|pack|run|search|test|view)
-  - allow: npx (eslint|playwright|scrns|tsc|tsx|vite|vitest)
+  - allow:
+    - node
+    - node -e
+  - allow:
+      pnpm: [add, approve-builds, audit, build, bundle, clean, config, create, dev, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, tsc, typecheck, update, vitest, why]
+      pnpm exec: [playwright, tsc]
+      npm: [install, pack, run, search, test, view]
+      npx: [eslint, playwright, scrns, tsc, tsx, vite, vitest]
 
   # ── Cargo / Rust ───────────────────────────────────────────────
-  - allow: cargo (build|check|clippy|doc|install|metadata|run|search|test|tree)
+  - allow:
+      cargo: [build, check, clippy, doc, install, metadata, run, search, test, tree]
   - allow: wasm-pack build
 
   # ── AWS (read-only) ───────────────────────────────────────────
-  - allow: aws s3 ls
-  - allow: aws s3api (get-bucket-cors|get-bucket-policy|get-public-access-block)
-  - allow: aws sts get-caller-identity
+  - allow:
+      aws s3: [ls]
+      aws s3api: [get-bucket-cors, get-bucket-policy, get-public-access-block]
+      aws sts: [get-caller-identity]
   - allow-regex: '^aws (logs |ec2 describe-)'
 
   # ── Other tools ────────────────────────────────────────────────
-  - allow: (bash|brew|chmod|diff-x|dvx|ffmpeg|git-diff-x|git-didi|gs|juq|ln|magick|mdcmd|mkdir|mktoc|pandoc|pdfseparate|scrns|source|yes)
+  - allow:
+    - brew
+    - chmod
+    - diff-x
+    - ffmpeg
+    - git-diff-x
+    - git-didi
+    - gs
+    - juq
+    - ln
+    - magick
+    - mdcmd
+    - mkdir
+    - mktoc
+    - pandoc
+    - pdfseparate
+    - scrns
+    - source
+    - yes
+  - allow:
+      dvx: [add, diff, import-url, run, status, version, --help]
   - allow-regex: '^curl (-s )?https?://localhost[:/]'
 
   # ── Project helpers ────────────────────────────────────────────
-  - allow: (bmdf|ghpr|pds|pqa|pqm|pqn|pqs)
+  - allow:
+    - bmdf
+    - ghpr
+    - pds
+    - pqa
+    - pqm
+    - pqn
+    - pqs
   - allow: gws docs documents get
