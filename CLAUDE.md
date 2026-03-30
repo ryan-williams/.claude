@@ -40,9 +40,11 @@ I use these acronyms and abbreviations:
 - HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless), PW = PlayWright (usual HLB library of choice), PPTR = Puppeteer (another HLB library)
 - SFs = significant figures / sig-figs
 - sg = sounds good
+- desc = description
 - gt = ground truth
 - RG = regenerate
 - CF = Cloudflare
+- py = python, ts = typescript, js = javascript
 - TFFP = Test-Fail-Fix-Pass: if I say this, I want you to:
   1. Add a test that repros an issue (with no fix applied)
   2. Verify the test repros the issue (with no fix applied)
