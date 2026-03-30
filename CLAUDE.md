@@ -42,6 +42,7 @@ I use these acronyms and abbreviations:
 - sg = sounds good
 - gt = ground truth
 - RG = regenerate
+- CF = Cloudflare
 - TFFP = Test-Fail-Fix-Pass: if I say this, I want you to:
   1. Add a test that repros an issue (with no fix applied)
   2. Verify the test repros the issue (with no fix applied)
