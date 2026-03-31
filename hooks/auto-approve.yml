@@ -73,6 +73,8 @@ rules:
       gh repo: [list, view]
       gh run: [download, list, rerun, view, watch]
       gh search: ~
+      gh secret: [list]
+      gh variable: [get, list]
       gh workflow: [list, run]
       gh gist: [list, view]
       glab: [api, ci]
