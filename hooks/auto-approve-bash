@@ -15,8 +15,13 @@ Pipelines and compound commands (|, &&, ||, ;, \n) are split into
 segments; ALL segments must be approved for the whole command to pass.
 
 Rule types:
-  allow: / deny:               Shlex-aware token matching (recommended)
-  allow-regex: / deny-regex:   Raw regex on command string (fallback)
+  allow: / deny: / ask:                    Shlex-aware token matching (recommended)
+  allow-regex: / deny-regex: / ask-regex:  Raw regex on command string (fallback)
+
+Actions:
+  allow   auto-approve, skip permission prompt
+  ask     stop matching, show normal permission prompt (user decides)
+  deny    hard block, never run
 
 Rule value formats:
   String    Single pattern: 'allow: git log'
@@ -463,7 +468,11 @@ def _match_trie(tokens: list[str], trie: dict) -> bool:
 def match_rules(command: str, rules: list[dict]) -> str | None:
     """Evaluate rules against a single command segment.
 
-    Returns 'allow', 'deny', or None.
+    Returns 'allow', 'deny', 'ask', or None.
+      allow → auto-approve
+      deny  → hard block
+      ask   → stop matching, fall through to normal permission prompt
+      None  → no rule matched, continue to normal prompt
 
     Pattern value types:
       str  → single pattern (parsed with parse_pattern)
@@ -481,7 +490,7 @@ def match_rules(command: str, rules: list[dict]) -> str | None:
         if not isinstance(rule, dict):
             continue
 
-        for action_key in ("allow", "deny", "allow-regex", "deny-regex"):
+        for action_key in ("allow", "deny", "ask", "allow-regex", "deny-regex", "ask-regex"):
             pattern = rule.get(action_key)
             if pattern is None:
                 continue
@@ -574,7 +583,7 @@ def evaluate_command(command: str, rules: list[dict]) -> str | None:
 
     ALL segments must be 'allow' → allow.
     ANY segment 'deny' → deny.
-    ANY segment None (no match) → None (normal prompt).
+    ANY segment 'ask' or None → None (normal prompt).
 
     Compound commands (for/done, if/fi, etc.) are decomposed: their
     body commands are evaluated individually.
@@ -591,7 +600,9 @@ def evaluate_command(command: str, rules: list[dict]) -> str | None:
         if body:
             segments = body
         else:
-            return match_rules(segments[0], rules)
+            decision = match_rules(segments[0], rules)
+            # 'ask' → fall through to normal prompt (same as None)
+            return None if decision == "ask" else decision
 
     # Expand any compound segments into their body commands
     expanded = []
@@ -607,7 +618,7 @@ def evaluate_command(command: str, rules: list[dict]) -> str | None:
         decision = match_rules(seg, rules)
         if decision == "deny":
             return "deny"
-        if decision is None:
+        if decision in (None, "ask"):
             has_ask = True
 
     return None if has_ask else "allow"

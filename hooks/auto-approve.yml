@@ -64,9 +64,10 @@ rules:
         - tag
 
   # ── GitHub / GitLab CLI ────────────────────────────────────────
-  - deny-regex: '^gh api .*(-X |--method )'
+  - ask-regex: '^gh api .*(-X |--method |-f |-F |--input |--raw-field )'
   - allow:
       gh api: ~
+      gh auth: [status]
       gh issue: [list, view]
       gh pr: [checks, list, view]
       gh release: [edit, list, view]
