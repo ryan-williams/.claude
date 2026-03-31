@@ -67,6 +67,7 @@ I use these acronyms and abbreviations:
   - HB = Hover Box (a.k.a. Tooltip, but on plots)
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 - DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
+- AA = auto-approve (see below)
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
@@ -107,6 +108,37 @@ If I ask you update a PR or issue title, description, or comment, check if it's 
 
 [`ghpr`]: https://github.com/runsascoded/ghpr
 [`ghpr-py`]: https://pypi.org/project/ghpr-py/
+
+## Auto-Approve (AA)
+A `PreToolUse` hook (`~/.claude/hooks/auto-approve-bash`) auto-approves Bash commands based on YAML rule specs, so I don't have to manually approve every safe command.
+
+### How it works
+- **Rules** are defined in YAML files: global (`~/.claude/hooks/auto-approve.yml`) and per-project (`.claude/hooks/auto-approve.yml`). Project rules are evaluated first; first match wins.
+- **Pipeline splitting**: Commands are split on `|`, `&&`, `||`, `;`, `&`, `\n` (quote-aware). ALL segments must be approved for the whole command to pass.
+- **Compound commands** (`for`/`done`, `if`/`fi`) are decomposed into body commands.
+- **Variable assignments** (`VAR=$(cmd)`, `export VAR=val`) are unwrapped.
+- **Logging**: All decisions go to `~/.claude/hooks/auto-approve.log`.
+
+### Rule actions
+- `allow` / `allow-regex:` — auto-approve, skip permission prompt
+- `ask` / `ask-regex:` — stop matching, show normal permission prompt
+- `deny` / `deny-regex:` — hard block
+
+### Rule value formats
+- **String**: `allow: git log` — single shlex-aware pattern (prefix match by default)
+- **List**: each item is a standalone pattern (readable for long lists of commands)
+- **Dict (trie)**: keys are prefix patterns, values are lists of allowed next tokens
+  ```yaml
+  - allow:
+      git: [branch, diff, log, status]
+      git -C *: [branch, diff, log, status]
+      pnpm: [add, build, test, dev]
+  ```
+
+### Commands
+- `/aa` — read last "ask" from log, propose per-segment rules for the rejected command
+- `/aa -g` (or `/aag`) — same, but write rules globally
+- `/bless <command>` — analyze a command/pipeline and propose AA rules
 
 ## Dotfiles / Bash
 - [runsascoded/.rc] is cloned at `~/.rc`, containing scripts and `alias`es I use frequently, grouped into Git submodules ≈per tool or category, e.g.:
