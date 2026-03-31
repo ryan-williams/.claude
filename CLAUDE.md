@@ -41,6 +41,7 @@ I use these acronyms and abbreviations:
 - SFs = significant figures / sig-figs
 - sg = sounds good
 - desc = description
+- SM = submodule (as in Git)
 - gt = ground truth
 - RG = regenerate
 - CF = Cloudflare
