@@ -44,6 +44,9 @@ I use these acronyms and abbreviations:
 - SM = submodule (as in Git)
 - gt = ground truth
 - RG = regenerate
+- HR = human-readable
+- DS = downstream, US = upstream (for dependencies, data flow, etc.)
+- LJ = left-justified, similarly RJ (right), CJ (center)
 - CF = Cloudflare
 - py = python, ts = typescript, js = javascript
 - TFFP = Test-Fail-Fix-Pass: if I say this, I want you to:
