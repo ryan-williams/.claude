@@ -76,7 +76,7 @@ rules:
       gh search: ~
       gh secret: [list]
       gh variable: [get, list]
-      gh workflow: [list, run]
+      gh workflow: [list]
       gh gist: [list, view]
       glab: [api, ci]
 
@@ -129,6 +129,7 @@ rules:
     - type
     - uniq
     - unzip
+    - wait
     - wc
     - which
     - xargs
@@ -182,7 +183,7 @@ rules:
     - node
     - node -e
   - allow:
-      pnpm: [add, approve-builds, audit, build, bundle, clean, config, create, dev, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, tsc, typecheck, update, vitest, why]
+      pnpm: [add, approve-builds, audit, build, bundle, clean, config, create, dev, info, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, tsc, typecheck, update, vitest, why]
       pnpm exec: [playwright, tsc]
       npm: [install, pack, run, search, test, view]
       npx: [eslint, playwright, scrns, tsc, tsx, vite, vitest]
