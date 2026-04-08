@@ -19,15 +19,16 @@
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations:
-- **WT**: Git worktree
-- **UCs**: Uncommitted Changes (staged and unstaged)
-- **SCs**: Staged Changes (Git index)
-- **USCs**: UnStaged Changes
-- **UFs** / **UTs**: UnTracked Files (Git)
-- **TP** / **FP** / **TN** / **FN**: True Positive / False Positive / True Negative / False Negative
-- **BC** = backwards-compatibility (a.k.a. back-compat). Often I'm working on code that I've not pushed anywhere, and BC concerns would only have to do with other checkpoints in my current feature branch, where BC is not important, and is even negative-value (bc it adds needless code complexity). In such cases I might just say "forget BC" or similar.
-- **DC** = double-check or double-click
-- **FFR** = For Future Reference
+- WT: Git worktree
+- UCs: Uncommitted Changes (staged and unstaged)
+- SCs: Staged Changes (Git index)
+- USCs: UnStaged Changes
+- UFs / UTs: UnTracked Files (Git)
+- TP / FP / TN / FN: True Positive / False Positive / True Negative / False Negative
+- BC = backwards-compatibility (a.k.a. back-compat). Often I'm working on code that I've not pushed anywhere, and BC concerns would only have to do with other checkpoints in my current feature branch, where BC is not important, and is even negative-value (bc it adds needless code complexity). In such cases I might just say "forget BC" or similar.
+- DC = double-check or double-click
+- FFR = for future reference
+- RL = rate-limited / rate-limits
 - OA = Open Athena (https://www.openathena.ai/, https://github.com/open-athena); "a nonprofit that accelerates academia with capabilities from the AI frontier", company I work for.
 - MD = metadata (or Markdown)
 - BP = boilerplate
@@ -40,12 +41,18 @@ I use these acronyms and abbreviations:
 - HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless), PW = PlayWright (usual HLB library of choice), PPTR = Puppeteer (another HLB library)
 - SFs = significant figures / sig-figs
 - sg = sounds good
+- EB = exponential backoff
+- BTS = behind the scenes
 - desc = description
+- CIC = check in chrome; use the MCP integration and verify the UI/UX being discussed, in a live browser
 - SM = submodule (as in Git)
 - gt = ground truth
 - RG = regenerate
 - HR = human-readable
+- LHS / RHS = {left,right}-hand side
+- GU = GPU utilization
 - DS = downstream, US = upstream (for dependencies, data flow, etc.)
+  - Sometimes, DS = dataset.
 - LJ = left-justified, similarly RJ (right), CJ (center)
 - CF = Cloudflare
 - py = python, ts = typescript, js = javascript
@@ -59,6 +66,8 @@ I use these acronyms and abbreviations:
   - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
 - GH = GitHub, GL = GitLab, GHA = GitHub Actions
 - "nop" = no-op
+- OM / OoM = order of magnitude
+- SE = side effect
 - ogi = `og:image`
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
