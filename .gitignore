@@ -1,1 +1,33 @@
 settings.local.json
+
+# Claude Code runtime artifacts
+backups/
+cache/
+chrome/
+debug/
+file-history/
+history.jsonl
+image-cache/
+mcp-needs-auth-cache.json
+paste-cache/
+plans/
+plugins/
+projects/
+sessions/
+shell-snapshots/
+skills/
+stats-cache.json
+statsig/
+tasks/
+telemetry/
+todos/
+usage-data/
+
+# Auto-approve log (runtime)
+hooks/auto-approve.log
+
+# Keybindings (user-specific)
+keybindings.json
+
+# Bug report files
+claude-autocomplete-bug.*
