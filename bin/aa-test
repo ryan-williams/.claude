@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Test whether a command would be auto-approved.
+#
+# Usage:
+#   aa-test 'git log --oneline'
+#   aa-test 'ssh della "ls /foo"'
+#   aa-test 'git log | head -5 && echo done'
+#   aa-test  # reads commands from stdin, one per line
+
+set -euo pipefail
+
+hook="$HOME/.claude/hooks/auto-approve-bash"
+
+test_cmd() {
+  local cmd="$1"
+  local json
+  json=$(python3 -c "import json,sys; print(json.dumps({'tool_input':{'command':sys.argv[1]}}))" "$cmd")
+  local result
+  result=$(echo "$json" | "$hook" 2>/dev/null)
+  if [ -n "$result" ]; then
+    local decision
+    decision=$(echo "$result" | python3 -c "import json,sys; print(json.load(sys.stdin)['hookSpecificOutput']['permissionDecision'])")
+    printf "%s  %s\n" "$decision" "$cmd"
+  else
+    printf "ask    %s\n" "$cmd"
+  fi
+}
+
+if [ $# -gt 0 ]; then
+  test_cmd "$*"
+else
+  while IFS= read -r line; do
+    [ -n "$line" ] && test_cmd "$line"
+  done
+fi
