@@ -51,6 +51,8 @@ I use these acronyms and abbreviations:
 - HR = human-readable
 - LHS / RHS = {left,right}-hand side
 - GU = GPU utilization
+- idk = I don't know, idr = I don't remember, idt = I don't think, …
+- sq = status quo
 - DS = downstream, US = upstream (for dependencies, data flow, etc.)
   - Sometimes, DS = dataset.
 - LJ = left-justified, similarly RJ (right), CJ (center)
