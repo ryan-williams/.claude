@@ -96,6 +96,7 @@ import sys
 import yaml
 
 LOG_FILE = Path.home() / ".claude" / "hooks" / "auto-approve.log"
+_ssh_rules: list[dict] = []  # Populated in main(), used by match_rules()
 
 
 # ── Token matchers ───────────────────────────────────────────────
@@ -392,44 +393,86 @@ def split_shell_commands(command: str) -> list[str]:
 
 # ── Rule loading and matching ────────────────────────────────────
 
-def load_rules(path: Path) -> list[dict]:
-    """Load rules from a YAML spec file."""
+def _load_yaml(path: Path) -> dict:
+    """Load and parse a YAML spec file. Returns empty dict on failure."""
     if not path.is_file():
-        return []
+        return {}
     try:
         data = yaml.safe_load(path.read_text())
-        return data.get("rules", []) if isinstance(data, dict) else []
+        return data if isinstance(data, dict) else {}
     except Exception as e:
         print(f"Warning: failed to parse {path}: {e}", file=sys.stderr)
-        return []
+        return {}
 
 
-def _unwrap_assignment(command: str) -> str:
-    """Unwrap variable assignments to get the actual command.
+def load_rules(path: Path) -> list[dict]:
+    """Load main rules from a YAML spec file."""
+    return _load_yaml(path).get("rules", [])
 
-    'VAR=$(cmd args)' → 'cmd args'
-    'export VAR=$(cmd)' → 'cmd'
-    'local VAR=value' → '' (no command)
-    'VAR=value cmd args' → 'cmd args' (env prefix)
-    'cmd args' → 'cmd args' (unchanged)
+
+def load_ssh_rules(path: Path) -> list[dict]:
+    """Load SSH-specific rules from a YAML spec file."""
+    return _load_yaml(path).get("ssh-rules", [])
+
+
+def _unwrap_command(command: str) -> tuple[str, str | None]:
+    """Unwrap assignments, SSH, etc. to get the actual command to evaluate.
+
+    Returns (unwrapped_command, ssh_host_or_None).
+
+    'VAR=$(cmd args)' → ('cmd args', None)
+    'export VAR=val' → ('', None)
+    'ssh host "cmd"' → ('cmd', 'host')
+    'ssh -o Foo host cmd' → ('cmd', 'host')
+    'cmd args' → ('cmd args', None)
     """
     cmd = command
+
     # Strip export/local/declare/readonly prefix
     m = re.match(r'^(export|local|declare|readonly|typeset)\s+', cmd)
     if m:
         cmd = cmd[m.end():]
+
     # Match VAR=...$(...) or VAR=$(...) patterns
     m = re.match(r'^[A-Za-z_]\w*=\$\((.+)\)\s*$', cmd)
     if m:
-        return m.group(1)
+        return m.group(1), None
     # Plain assignment: VAR=value (no command to evaluate)
     if re.match(r'^[A-Za-z_]\w*=\S*\s*$', cmd):
-        return ""
+        return "", None
     # Env-prefix pattern: VAR=value cmd args → evaluate 'cmd args'
     m = re.match(r'^[A-Za-z_]\w*=\S*\s+(.+)$', cmd)
     if m:
-        return m.group(1)
-    return cmd
+        cmd = m.group(1)
+
+    # SSH: extract remote command and host
+    # ssh [options] host command...
+    if cmd.startswith("ssh "):
+        tokens = shlex_split_safe(cmd)
+        if tokens and tokens[0] == "ssh":
+            # Skip ssh options (flags with args: -o, -p, -i, -l, -J, etc.)
+            opts_with_args = {"-o", "-p", "-i", "-l", "-J", "-F", "-S", "-W", "-b", "-c", "-D", "-E", "-L", "-R"}
+            i = 1
+            while i < len(tokens):
+                if tokens[i].startswith("-"):
+                    if tokens[i] in opts_with_args and i + 1 < len(tokens):
+                        i += 2  # skip flag + its argument
+                    else:
+                        i += 1  # skip bare flag (-v, -n, -T, etc.)
+                else:
+                    break
+            if i < len(tokens):
+                host = tokens[i]
+                remote_cmd = tokens[i + 1:] if i + 1 < len(tokens) else []
+                if remote_cmd:
+                    # If single token, it was quoted: "ls -la /foo"
+                    # If multiple tokens, they're separate args
+                    if len(remote_cmd) == 1:
+                        return remote_cmd[0], host
+                    else:
+                        return " ".join(remote_cmd), host
+
+    return cmd, None
 
 
 def _match_trie(tokens: list[str], trie: dict) -> bool:
@@ -479,10 +522,16 @@ def match_rules(command: str, rules: list[dict]) -> str | None:
       list → each item is a standalone pattern string
       dict → trie: keys are prefixes, values are lists/dicts/null
     """
-    # Unwrap variable assignments
-    command = _unwrap_assignment(command)
+    # Unwrap assignments, SSH, etc.
+    command, ssh_host = _unwrap_command(command)
     if not command:
         return "allow"  # Plain assignment, always safe
+
+    # SSH: the remote command is a full shell string that needs its own
+    # pipeline splitting, compound handling, etc. — recurse through
+    # evaluate_command with SSH-specific rules (more restrictive).
+    if ssh_host is not None:
+        return evaluate_command(command, _ssh_rules)
 
     tokens = shlex_split_safe(command)
 
@@ -632,13 +681,21 @@ def main():
     if not command:
         return
 
+    global _ssh_rules
+
     all_rules = []
+    all_ssh_rules = []
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
     if project_dir:
-        all_rules.extend(
-            load_rules(Path(project_dir) / ".claude" / "hooks" / "auto-approve.yml")
-        )
-    all_rules.extend(load_rules(Path.home() / ".claude" / "hooks" / "auto-approve.yml"))
+        project_yml = Path(project_dir) / ".claude" / "hooks" / "auto-approve.yml"
+        all_rules.extend(load_rules(project_yml))
+        all_ssh_rules.extend(load_ssh_rules(project_yml))
+    global_yml = Path.home() / ".claude" / "hooks" / "auto-approve.yml"
+    all_rules.extend(load_rules(global_yml))
+    all_ssh_rules.extend(load_ssh_rules(global_yml))
+
+    # Make SSH rules available to match_rules via module-level variable
+    _ssh_rules = all_ssh_rules
 
     decision = evaluate_command(command, all_rules)
 
@@ -651,7 +708,7 @@ def main():
         cmd_short = command[:120]
         with open(LOG_FILE, "a") as f:
             f.write(f"{ts}  {label:5s}  {proj}  {cmd_short}\n")
-    except Exception:
+    except OSError:
         pass
 
     if decision is None:

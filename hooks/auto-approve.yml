@@ -219,7 +219,7 @@ rules:
     - pdfseparate
     - scrns
     - source
-    - yes
+    - "yes"
   - allow:
       dvx: [add, diff, import-url, run, status, version, --help]
   - allow-regex: '^curl (-s )?https?://localhost[:/]'
@@ -233,4 +233,44 @@ rules:
     - pqm
     - pqn
     - pqs
-  - allow: gws docs documents get
+  - allow:
+      gws auth: [status]
+      gws docs documents: [get]
+
+# ── SSH remote command rules ───────────────────────────────────────
+# These are evaluated INSTEAD OF the main rules for commands inside
+# `ssh host "cmd"`. Only truly read-only commands belong here.
+ssh-rules:
+  - allow:
+    - awk
+    - cat
+    - cd
+    - cut
+    - df
+    - du
+    - echo
+    - env
+    - file
+    - find
+    - grep
+    - head
+    - hostname
+    - ls
+    - mount
+    - ps
+    - pwd
+    - readlink
+    - sed -n
+    - sort
+    - stat
+    - tail
+    - tr
+    - tree
+    - uname
+    - uniq
+    - wc
+    - which
+    - whoami
+  - allow:
+      git: [branch, diff, log, ls-files, ls-tree, reflog, remote, rev-list, rev-parse, show, status, tag]
+      git -C *: [branch, diff, log, ls-files, ls-tree, reflog, remote, rev-list, rev-parse, show, status, tag]
