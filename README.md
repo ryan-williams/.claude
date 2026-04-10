@@ -1,41 +1,93 @@
 # Claude Code Configuration
 
-Personal [Claude Code] configuration and custom commands.
+Personal [Claude Code] configuration: global instructions, custom commands, auto-approve hooks, and CLI helpers.
 
-## Overview
+## Structure
 
-This repository contains my global Claude Code settings, including:
+| Path | Purpose |
+|------|---------|
+| `CLAUDE.md` | Global instructions loaded into every session |
+| `commands/` | Custom slash commands |
+| `hooks/` | Auto-approve hook (PreToolUse) |
+| `bin/` | CLI helper scripts |
+| `settings.json` | Global permissions, hook config, plugins |
+| `tests/` | Pytest tests for the hook engine |
 
-- **`CLAUDE.md`**: Global instructions that Claude Code reads in every session
-- **`commands/`**: Custom slash commands for common workflows
+## Auto-Approve (AA) System
 
-## Custom Commands
+A `PreToolUse` hook that auto-approves safe Bash commands based on YAML rules, so common read-only commands don't need manual approval.
 
-- **`/amend`**: Amend HEAD with uncommitted changes and rewrite the commit message
-  - `/amend preserve` - Incorporate manual edits to the existing commit message
-  - `/amend <context>` - Use additional context when drafting the message
-- **`/docs`**: Review and update documentation files
-  - `/docs <path>` - Focus on specific files or directories
-- **`/commit`**: Analyze and commit changes
-  - `/commit` - Commit in current directory
-  - `/commit <path>` - Commit in a different repository
+**How it works:**
+- Rules in `hooks/auto-approve.yml` (global) and per-project `.claude/hooks/auto-approve.yml`
+- Commands are split on `|`, `&&`, `||`, `;`, `&`, `\n` — ALL segments must pass
+- Shell compound commands (`for`/`done`, `if`/`fi`) are decomposed into body commands
+- Variable assignments (`VAR=$(cmd)`) and SSH (`ssh host "cmd"`) are unwrapped
+- SSH commands are evaluated against a restricted `ssh-rules` subset
 
-## Configuration Highlights
+**Rule formats:**
+```yaml
+# String pattern (shlex-aware, prefix match)
+- allow: git log
 
-Key preferences documented in `CLAUDE.md`:
+# List of patterns
+- allow:
+  - cat
+  - head
+  - tail
 
-- **Git**: Use `git add -u` (not `-A`), avoid `git clean`, backticks for code symbols in commit messages
-- **Python**: Multi-version venv system with `uv` and `direnv`, direct tool invocation without `uv run` prefixes
-- **Coding style**: Direct imports, trailing commas, explicit error handling
-- **Markdown**: Footer-style link definitions
+# Trie (prefix → allowed subcommands)
+- allow:
+    git: [branch, diff, log, status]
+    git -C *: [branch, diff, log, status]
 
-## Setup
+# Regex fallback
+- allow-regex: '^curl (-s )?https?://localhost[:/]'
+```
 
-This is my `~/.claude` directory. To use similar configurations:
+**Actions:** `allow` (auto-approve), `ask` (prompt normally), `deny` (hard block)
 
-1. Create custom slash commands in `.claude/commands/*.md`
-2. Add global instructions to `.claude/CLAUDE.md`
-3. See [Claude Code documentation] for more details
+**YAML anchors** share read-only command lists between local and SSH rules.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `/c [phases]` | Flexible Git workflow: `t`est, `c`ommit, `a`mend, `s`taged, `p`ush, `d`ispatch, `w`atch |
+| `/commit` | Analyze and commit changes |
+| `/commits` | Split changes into multiple logical commits |
+| `/cs` | Commit staged changes only |
+| `/amend` | Amend HEAD and rewrite commit message |
+| `/resolve` (`/res`) | Resolve Git conflicts intelligently |
+| `/w` | Watch most recent CI run (GitHub/GitLab) |
+| `/pw` | Push, then watch CI |
+| `/aa` | Propose auto-approve rules for last rejected command |
+| `/aag` | Same as `/aa -g` (global rules) |
+| `/bless <cmd>` | Analyze a command and propose AA rules |
+| `/kill-server` (`/ks`) | Kill/restart dev server |
+| `/spec` | Write a spec file for another project |
+| `/specs` | Check for and implement pending specs |
+| `/pdsd` | Retry after dependency update via `pds` |
+| `/docs` | Review and update documentation |
+
+## CLI Helpers (`bin/`)
+
+| Script | Description |
+|--------|-------------|
+| `aa-test` | Test if a command would be auto-approved |
+| `bcg` | Shorthand for `bless-cmd -g` (global) |
+| `bless-cmd` | Add a permission to Claude settings (`-g` for global) |
+| `bless-repo` | Add read-only git permissions for a repo |
+| `claude-cp` | Copy a Claude project config to a new path |
+| `claude-mv` | Move a project directory and update Claude configs |
+| `claude-settings-clean` | Clean up Claude settings files |
+
+## Testing
+
+```bash
+pytest tests/ -v        # Run all tests
+aa-test 'git log'       # Test a single command against AA rules
+```
+
+CI runs on push via [GitHub Actions](.github/workflows/test.yml).
 
 [Claude Code]: https://claude.com/claude-code
-[Claude Code documentation]: https://docs.claude.com/docs/claude-code
