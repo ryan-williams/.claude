@@ -1,0 +1,1 @@
+autosquash.md
