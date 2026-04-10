@@ -8,17 +8,21 @@ Personal [Claude Code] configuration: global instructions, custom commands, auto
 |------|---------|
 | `CLAUDE.md` | Global instructions loaded into every session |
 | `commands/` | Custom slash commands |
-| `hooks/` | Auto-approve hook (PreToolUse) |
+| [`hooks/`](hooks/) | Auto-approve hook ([engine], [rules]) |
 | `bin/` | CLI helper scripts |
 | `settings.json` | Global permissions, hook config, plugins |
 | `tests/` | Pytest tests for the hook engine |
 
 ## Auto-Approve (AA) System
 
-A `PreToolUse` hook that auto-approves safe Bash commands based on YAML rules, so common read-only commands don't need manual approval.
+A `PreToolUse` hook that auto-approves safe Bash commands based on YAML rules, so common read-only commands don't need manual approval:
+
+- [`auto_approve.py`][engine]: engine
+- [`auto-approve.yml`][rules]: my rules
+- [Hooks docs][hooks]
 
 **How it works:**
-- Rules in `hooks/auto-approve.yml` (global) and per-project `.claude/hooks/auto-approve.yml`
+- Rules in [`hooks/auto-approve.yml`][rules] (global) and per-project `.claude/hooks/auto-approve.yml`
 - Commands are split on `|`, `&&`, `||`, `;`, `&`, `\n` — ALL segments must pass
 - Shell compound commands (`for`/`done`, `if`/`fi`) are decomposed into body commands
 - Variable assignments (`VAR=$(cmd)`) and SSH (`ssh host "cmd"`) are unwrapped
@@ -67,6 +71,7 @@ A `PreToolUse` hook that auto-approves safe Bash commands based on YAML rules, s
 | `/spec` | Write a spec file for another project |
 | `/specs` | Check for and implement pending specs |
 | `/pdsd` | Retry after dependency update via `pds` |
+| `/autosquash` (`/as`) | Autosquash uncommitted changes onto ancestor commits |
 | `/docs` | Review and update documentation |
 
 ## CLI Helpers (`bin/`)
@@ -91,3 +96,7 @@ aa-test 'git log'       # Test a single command against AA rules
 CI runs on push via [GitHub Actions](.github/workflows/test.yml).
 
 [Claude Code]: https://claude.com/claude-code
+[engine]: hooks/auto_approve.py
+[rules]: hooks/auto-approve.yml
+[YAML rules]: hooks/auto-approve.yml
+[hooks]: https://code.claude.com/docs/en/hooks
