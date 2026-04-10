@@ -83,6 +83,7 @@ I use these acronyms and abbreviations:
 - DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 - AA = auto-approve (see below), AAG = auto-approve globally
 - WB = wandb = Weights & Biases
+- RO = read-only, RW = read-write
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
