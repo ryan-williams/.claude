@@ -194,7 +194,7 @@ rules:
   # ── AWS (read-only) ───────────────────────────────────────────
   - allow:
       aws s3: [ls]
-      aws s3api: [get-bucket-cors, get-bucket-policy, get-public-access-block]
+      aws s3api: [get-bucket-cors, get-bucket-policy, get-public-access-block, head-object]
       aws sts: [get-caller-identity]
   - allow-regex: '^aws (logs |ec2 describe-)'
 
