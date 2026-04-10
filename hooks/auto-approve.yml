@@ -13,55 +13,76 @@
 #   "text *"    one token matching glob (* = any chars)
 #   $           end anchor: no extra args allowed
 #
-# Use allow-regex: / deny-regex: for raw regex fallback.
+# Use allow-regex: / deny-regex: / ask-regex: for raw regex fallback.
+
+# ── Shared anchors ───────────────────────────────────────────────
+# These are reused in both `rules` (local) and `ssh-rules` (remote).
+
+# Read-only shell commands safe both locally and over SSH
+_ssh_safe_cmds: &ssh-safe-cmds
+  - awk
+  - cat
+  - cd
+  - cut
+  - df
+  - du
+  - echo
+  - env
+  - file
+  - find
+  - getfacl
+  - grep
+  - head
+  - hostname
+  - ls
+  - mount
+  - ps
+  - pwd
+  - readlink
+  - sort
+  - stat
+  - tail
+  - tr
+  - tree
+  - uname
+  - uniq
+  - wc
+  - which
+  - whoami
+
+# Read-only git subcommands safe both locally and over SSH
+_ssh_safe_git: &ssh-safe-git
+  - branch
+  - diff
+  - log
+  - ls-files
+  - ls-tree
+  - merge-base
+  - reflog
+  - remote
+  - rev-list
+  - rev-parse
+  - show
+  - show-ref
+  - stash
+  - status
+  - tag
 
 rules:
   # ── Git (read-only) ─────────────────────────────────────────────
   - allow:
       git:
-        - branch
         - cat-file
         - check-ignore
         - clone
         - config
-        - diff
         - diff-x
         - fetch
         - init
-        - log
-        - ls-files
-        - ls-tree
-        - merge-base
         - mv
-        - reflog
-        - remote
-        - rev-list
-        - rev-parse
-        - show
-        - show-ref
-        - stash
-        - status
-        - tag
-      git -C *:
-        - branch
-        - cat-file
-        - check-ignore
-        - diff
-        - diff-x
-        - fetch
-        - log
-        - ls-files
-        - ls-tree
-        - merge-base
-        - reflog
-        - remote
-        - rev-list
-        - rev-parse
-        - show
-        - show-ref
-        - stash
-        - status
-        - tag
+      git -C *: *ssh-safe-git
+  - allow:
+      git: *ssh-safe-git
 
   # ── GitHub / GitLab CLI ────────────────────────────────────────
   - ask-regex: '^gh api .*(-X |--method |-f |-F |--input |--raw-field )'
@@ -81,58 +102,34 @@ rules:
       glab: [api, ci]
 
   # ── Shell read-only / inspection ───────────────────────────────
+  - allow: *ssh-safe-cmds
   - allow:
     - alias
-    - awk
     - bc
-    - cat
-    - cd
     - col
-    - cut
-    - df
     - dig
-    - du
-    - echo
-    - env
     - ffprobe
-    - file
-    - find
-    - getfacl
-    - grep
     - gzip
     - gunzip
-    - head
     - hexdump
     - identify
     - jq
-    - ls
     - lsof
     - md5
     - pdfinfo
     - pgrep
     - printf
-    - ps
-    - readlink
     - rg
     - sed
     - sips
     - sleep
-    - sort
     - sqlite3
-    - stat
-    - tail
     - tar
     - tee
     - test
     - touch
-    - tr
-    - tree
     - type
-    - uniq
-    - unzip
     - wait
-    - wc
-    - which
     - xargs
     - xq
     - xxd
@@ -242,37 +239,7 @@ rules:
 # These are evaluated INSTEAD OF the main rules for commands inside
 # `ssh host "cmd"`. Only truly read-only commands belong here.
 ssh-rules:
+  - allow: *ssh-safe-cmds
   - allow:
-    - awk
-    - cat
-    - cd
-    - cut
-    - df
-    - du
-    - echo
-    - env
-    - file
-    - find
-    - getfacl
-    - grep
-    - head
-    - hostname
-    - ls
-    - mount
-    - ps
-    - pwd
-    - readlink
-    - sed -n
-    - sort
-    - stat
-    - tail
-    - tr
-    - tree
-    - uname
-    - uniq
-    - wc
-    - which
-    - whoami
-  - allow:
-      git: [branch, diff, log, ls-files, ls-tree, reflog, remote, rev-list, rev-parse, show, status, tag]
-      git -C *: [branch, diff, log, ls-files, ls-tree, reflog, remote, rev-list, rev-parse, show, status, tag]
+      git: *ssh-safe-git
+      git -C *: *ssh-safe-git
