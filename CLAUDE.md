@@ -84,6 +84,8 @@ I use these acronyms and abbreviations:
 - AA = auto-approve (see below), AAG = auto-approve globally
 - WB = wandb = Weights & Biases
 - RO = read-only, RW = read-write
+- st = something, ost = or something
+- fp = force-push, afp = amend (or autosquash) + force-push
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
