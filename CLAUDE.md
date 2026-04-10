@@ -81,7 +81,8 @@ I use these acronyms and abbreviations:
   - HB = Hover Box (a.k.a. Tooltip, but on plots)
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 - DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
-- AA = auto-approve (see below)
+- AA = auto-approve (see below), AAG = auto-approve globally
+- WB = wandb = Weights & Biases
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
