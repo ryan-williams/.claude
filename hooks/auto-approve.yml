@@ -97,6 +97,7 @@ rules:
     - ffprobe
     - file
     - find
+    - getfacl
     - grep
     - gzip
     - gunzip
@@ -252,6 +253,7 @@ ssh-rules:
     - env
     - file
     - find
+    - getfacl
     - grep
     - head
     - hostname
