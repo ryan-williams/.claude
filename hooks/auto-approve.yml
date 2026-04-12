@@ -228,9 +228,11 @@ rules:
     - ghpr
     - pds
     - pqa
+    - pqh
     - pqm
     - pqn
     - pqs
+    - pqtl
   - allow:
       gws auth: [status]
       gws docs documents: [get]
