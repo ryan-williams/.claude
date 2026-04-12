@@ -86,6 +86,9 @@ I use these acronyms and abbreviations:
 - RO = read-only, RW = read-write
 - st = something, ost = or something
 - fp = force-push, afp = amend (or autosquash) + force-push
+- asq = autosquash
+- utd = up to date
+- acas = atomic compare and swap
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
