@@ -181,7 +181,9 @@ rules:
     - node
     - node -e
   - allow:
-      pnpm: [add, approve-builds, audit, build, bundle, clean, config, create, dev, info, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, tsc, typecheck, update, vitest, why]
+      pnpm: &pnpm-subcmds [add, approve-builds, audit, build, bundle, clean, config, create, dev, info, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, tsc, typecheck, update, vitest, why]
+      pnpm -s: *pnpm-subcmds
+      pnpm --silent: *pnpm-subcmds
       pnpm exec: [playwright, tsc]
       npm: [install, pack, run, search, test, view]
       npx: [eslint, playwright, scrns, tsc, tsx, vite, vitest]
