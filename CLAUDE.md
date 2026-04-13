@@ -89,6 +89,8 @@ I use these acronyms and abbreviations:
 - asq = autosquash
 - utd = up to date
 - acas = atomic compare and swap
+- SA = surface area, BSA = bug surface area
+- RC = root cause, RCF = root cause and fix (verb / command)
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
