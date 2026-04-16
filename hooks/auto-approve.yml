@@ -137,6 +137,17 @@ rules:
     - zip
   - allow: /usr/bin/(col|stat)
   - allow: "["
+  - allow:
+    - getent
+    - md5sum
+    - netstat
+
+  # ── Dry-run / simulate flags (per-command; safe by convention) ──────
+  - allow-regex: '^dvx (push|pull|fetch) .*--dry-run\b'
+  - allow-regex: '^dvc (push|pull|fetch) .*--dry\b'
+  - allow-regex: '^git push .*--dry-run\b'
+  - allow-regex: '^aws s3 (sync|cp|mv) .*--dryrun\b'
+  - allow-regex: '^rsync .* --dry-run\b'
 
   # ── macOS ───────────────────────────────────────────────────────
   - allow: defaults read
