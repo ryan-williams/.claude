@@ -197,9 +197,13 @@ rules:
       pnpm --silent: *pnpm-subcmds
       pnpm -C *: *pnpm-subcmds
       pnpm --dir *: *pnpm-subcmds
+      pnpm -F *: *pnpm-subcmds
+      pnpm --filter *: *pnpm-subcmds
       pnpm exec: &pnpm-exec-subcmds [playwright, tsc]
       pnpm -C * exec: *pnpm-exec-subcmds
       pnpm --dir * exec: *pnpm-exec-subcmds
+      pnpm -F * exec: *pnpm-exec-subcmds
+      pnpm --filter * exec: *pnpm-exec-subcmds
       npm: [install, pack, run, search, test, view]
       npx: [eslint, playwright, scrns, tsc, tsx, vite, vitest]
   - allow-regex: '(^|/)tsc( |$)'
