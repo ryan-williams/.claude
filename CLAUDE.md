@@ -6,16 +6,14 @@
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
   - `curl`s should write their outputs to a local file, then read from there (more like typical `wget` usage). You shouldn't have to `curl` the same file twice in quick succession / if you're not expecting it to have changed.
 - I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
-- When I want a Claude session in one project to make changes in another project, I will have a separate session run in that project. I avoid having multiple Claude sessions active in any given project/directory.
-  - The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there. 
+- When I want a Claude session in one project to make changes in another project, I will have a separate session run in that project. I avoid having multiple Claude sessions active in any given project/directory. The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there:
   - Write into `specs/` in the root dir of the target project.
-  - In the target project:
-    - Commit the initial `specs/….md` before starting to implement.
-      - The "target" project can do the committing though (not the writing project).
-      - After src project writes spec, it's easiest for me to `gs` in the dst project to find the new, untracked spec file.
-    - When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
-    - If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
-- fsr, your environment seems to strip token env vars when you try to set them inline on bash commands. In order to use token env vars, you need to access them from within a script wrapper (e.g. a python script).
+    - The "target" project can commit the spec though (not the writing project).
+    - After src project writes spec, it's easiest for me to `gs` in the dst project to find the new, untracked spec file.
+  - In the target project, commit the initial `specs/….md` before starting to implement.
+  - When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
+  - If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
+- FSR, your environment seems to strip token env vars when you try to set them inline on bash commands. In order to use token env vars, you need to access them from within a script wrapper (e.g. a python script).
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations:
@@ -48,6 +46,7 @@ I use these acronyms and abbreviations:
 - SM = submodule (as in Git)
 - gt = ground truth
 - RG = regenerate
+- OB = omnibar
 - HR = human-readable
 - LHS / RHS = {left,right}-hand side
 - GU = GPU utilization
@@ -73,7 +72,7 @@ I use these acronyms and abbreviations:
 - ogi = `og:image`
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
-  - LS / SS = `localStorage` / `sessionStorage`
+  - LS / SS = `localStorage` / `sessionStorage`, PLS / PSS = persist in `{local,session}Storage`
   - LM / DM = Light Mode / Dark Mode (for theming)
   - vp / vh / vw = viewport, viewport height, viewport width
   - LIs = legend items
@@ -82,6 +81,7 @@ I use these acronyms and abbreviations:
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 - DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 - AA = auto-approve (see below), AAG = auto-approve globally
+- a2a = "apples to apples"
 - WB = wandb = Weights & Biases
 - RO = read-only, RW = read-write
 - st = something, ost = or something
@@ -91,6 +91,7 @@ I use these acronyms and abbreviations:
 - acas = atomic compare and swap
 - SA = surface area, BSA = bug surface area
 - RC = root cause, RCF = root cause and fix (verb / command)
+- DL(s) = debug log(s)
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
@@ -261,6 +262,7 @@ uv sync          # Sync dependencies
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
 - I usually use Vite, TS, React, and SASS. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
 - I ≈always want @floating-ui/react Tooltips, not browser-native tooltips. The latter take too long to appear, and are too small/flat/unstyleable/plain.
+- Similarly, tanstack/react-query is my go-to for data fetching and caching in React apps; DIY `useEffect` should be used sparingly / graduate to "TSQ" early in projects' life.
 - Each project should default its dev (or built) servers to a hopefully-unique, unused port (not Vite's default 5173, slidev's 3030, http-server's 8080, etc.) to avoid conflicts when running multiple projects simultaneously on a given host.
   - A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
 - Check whether there's a server running on the desired port before starting any server and, if so, warn and prompt me.
@@ -305,11 +307,9 @@ Several tools I often use while developing other applications and libraries:
 And a few libraries I often use in JS/TS apps:
 - [`use-kbd`] (https://github.com/runsascoded/use-kbd): Omnibars, editable hotkeys, search, and keyboard-navigation for React apps.
 - [`use-prms`] (https://github.com/runsascoded/use-prms): React hooks for managing URL query parameters with type-safe encoding/decoding
-- [`@rdub/base`] (https://gitlab.com/runsascoded/js/base): helpers and convenience imports arguably missing from stdlib (e.g. for Object, Array, Math, …; also some React)
 
 [`use-kbd`]: https://www.npmjs.com/package/use-kbd
 [`use-prms`]: https://www.npmjs.com/package/use-prms
-[`@rdub/base`]: https://www.npmjs.com/package/@rdub/base
 
 ## Markdown
 - Define links' hrefs in the "footer", so that the inline links only require writing e.g. `[anchor text]` or `[long anchor text][short name]`, not full URLs.
