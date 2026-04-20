@@ -202,6 +202,7 @@ rules:
       pnpm --dir * exec: *pnpm-exec-subcmds
       npm: [install, pack, run, search, test, view]
       npx: [eslint, playwright, scrns, tsc, tsx, vite, vitest]
+  - allow-regex: '(^|/)tsc( |$)'
 
   # ── Cargo / Rust ───────────────────────────────────────────────
   - allow:
@@ -253,6 +254,9 @@ rules:
   - allow:
       gws auth: [status]
       gws docs documents: [get]
+      gws drive comments: [list]
+      gws --help: ~
+      modal volume: [list, ls]
 
 # ── SSH remote command rules ───────────────────────────────────────
 # These are evaluated INSTEAD OF the main rules for commands inside

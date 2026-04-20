@@ -16,6 +16,7 @@ from auto_approve import (
     _extract_compound_body,
     _match_trie,
     _reassemble_compounds,
+    _strip_wrappers,
     _unwrap_command,
     evaluate_command,
     match_rules,
@@ -187,6 +188,33 @@ class TestExtractCompoundBody:
 
     def test_not_compound(self):
         assert _extract_compound_body("echo hello") is None
+
+
+# ── Wrapper stripping ───────────────────────────────────────────
+
+class TestStripWrappers:
+    def test_nohup(self):
+        assert _strip_wrappers("nohup pnpm dev > /tmp/dev.log 2>&1") == "pnpm dev > /tmp/dev.log 2>&1"
+
+    def test_timeout(self):
+        assert _strip_wrappers("timeout 30 git log --oneline") == "git log --oneline"
+
+    def test_time(self):
+        assert _strip_wrappers("time ls -la") == "ls -la"
+
+    def test_nice_with_flag(self):
+        assert _strip_wrappers("nice -n 10 pnpm build") == "pnpm build"
+
+    def test_no_wrapper(self):
+        assert _strip_wrappers("git log") == "git log"
+
+    def test_nested_wrappers(self):
+        assert _strip_wrappers("nohup time pnpm build") == "pnpm build"
+
+    def test_preserves_redirects(self):
+        result = _strip_wrappers("nohup cmd > /tmp/out 2>&1")
+        assert ">" in result
+        assert "2>&1" in result
 
 
 # ── Command unwrapping ──────────────────────────────────────────

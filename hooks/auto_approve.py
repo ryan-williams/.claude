@@ -305,12 +305,86 @@ def load_ssh_rules(path: Path) -> list[dict]:
     return _load_yaml(path).get("ssh-rules", [])
 
 
+# Commands that wrap another command. Each maps to how many args to skip
+# after the wrapper keyword before the wrapped command begins.
+# None = skip flags until a non-flag token, then skip that too if it's an arg.
+_WRAPPER_CMDS = {
+    "nohup": 0,       # nohup cmd args...
+    "time": 0,         # time cmd args...
+    "nice": None,      # nice [-n N] cmd args...
+    "ionice": None,    # ionice [-c N] [-n N] cmd args...
+    "timeout": 1,      # timeout DURATION cmd args...
+    "strace": None,    # strace [-flags] cmd args...
+    "ltrace": None,    # ltrace [-flags] cmd args...
+}
+
+
+def _strip_wrappers(cmd: str) -> str:
+    """Strip wrapper commands (nohup, timeout, time, etc.) to get the inner command.
+
+    Operates on the raw string to preserve redirects and other shell syntax
+    that shlex.join would mangle.
+    """
+    stripped = cmd
+    changed = True
+    while changed:
+        changed = False
+        tokens = shlex_split_safe(stripped)
+        if not tokens or tokens[0] not in _WRAPPER_CMDS:
+            break
+
+        skip_mode = _WRAPPER_CMDS[tokens[0]]
+        # Count how many tokens to skip
+        skip_count = 1  # the wrapper itself
+
+        if skip_mode is None:
+            # Skip flags and their args
+            i = 1
+            while i < len(tokens) and tokens[i].startswith("-"):
+                i += 1
+                if i < len(tokens) and not tokens[i].startswith("-"):
+                    i += 1
+            skip_count = i
+        elif isinstance(skip_mode, int):
+            skip_count = 1 + skip_mode
+
+        # Find the position in the raw string where the inner command starts
+        # by finding each skipped token and advancing past it
+        pos = 0
+        for _ in range(skip_count):
+            # Skip whitespace
+            while pos < len(stripped) and stripped[pos] == " ":
+                pos += 1
+            if pos >= len(stripped):
+                return cmd
+            # Skip the token (could be quoted)
+            if stripped[pos] in ('"', "'"):
+                quote = stripped[pos]
+                pos += 1
+                while pos < len(stripped) and stripped[pos] != quote:
+                    if stripped[pos] == "\\" and pos + 1 < len(stripped):
+                        pos += 2
+                    else:
+                        pos += 1
+                pos += 1  # closing quote
+            else:
+                while pos < len(stripped) and stripped[pos] != " ":
+                    pos += 1
+
+        result = stripped[pos:].strip()
+        if result and result != stripped:
+            stripped = result
+            changed = True
+
+    return stripped
+
+
 def _unwrap_command(command: str) -> tuple[str, str | None]:
-    """Unwrap assignments, SSH, etc. to get the actual command to evaluate.
+    """Unwrap wrappers, assignments, SSH, etc. to get the actual command.
 
     Returns (unwrapped_command, ssh_host_or_None).
     """
-    cmd = command
+    cmd = _strip_wrappers(command)
 
     m = re.match(r'^(export|local|declare|readonly|typeset)\s+', cmd)
     if m:
