@@ -73,6 +73,8 @@ A `PreToolUse` hook that auto-approves safe Bash commands based on YAML rules, s
 | `/pdsd` | Retry after dependency update via `pds` |
 | `/autosquash` (`/as`) | Autosquash uncommitted changes onto ancestor commits |
 | `/docs` | Review and update documentation |
+| `/afk` | Mobile-mode: keep making progress, prompt sparingly |
+| `/back [duration]` | Returning from a break — produce a short status brief |
 
 ## CLI Helpers (`bin/`)
 
