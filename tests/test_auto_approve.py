@@ -454,3 +454,77 @@ class TestRealRules:
         assert evaluate_command("gh api /repos/foo/pulls", rules, ssh_rules) == "allow"
         # ask-regex matches, evaluate_command returns None (not deny)
         assert evaluate_command("gh api -f body=hi /repos/foo", rules, ssh_rules) is None
+
+
+# ── Spec validation ─────────────────────────────────────────────
+
+class TestValidateSpec:
+    def test_valid_with_rules_only(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("rules:\n  - allow: ls\n")
+        assert validate_spec(p) == []
+
+    def test_valid_with_rules_and_ssh_rules(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("rules:\n  - allow: ls\nssh-rules:\n  - allow: cat\n")
+        assert validate_spec(p) == []
+
+    def test_valid_with_anchor_keys(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("_safe: &safe\n  - cat\n  - ls\nrules:\n  - allow: *safe\n")
+        assert validate_spec(p) == []
+
+    def test_missing_file(self, tmp_path):
+        from auto_approve import validate_spec
+        assert validate_spec(tmp_path / "nope.yml") == []
+
+    def test_empty_file(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("")
+        assert validate_spec(p) == []
+
+    def test_top_level_list(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("- allow: ls\n- allow: cat\n")
+        warnings = validate_spec(p)
+        assert len(warnings) == 1
+        assert "top-level is a list" in warnings[0]
+        assert "no rules loaded" in warnings[0]
+
+    def test_top_level_scalar(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("just-a-string\n")
+        warnings = validate_spec(p)
+        assert len(warnings) == 1
+        assert "top-level is a str" in warnings[0]
+
+    def test_unknown_key(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("rule:\n  - allow: ls\n")  # typo: rule (not rules)
+        warnings = validate_spec(p)
+        assert len(warnings) == 1
+        assert "unrecognized top-level key 'rule'" in warnings[0]
+
+    def test_multiple_unknown_keys(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("rules:\n  - allow: ls\nfoo: 1\nbar: 2\n")
+        warnings = validate_spec(p)
+        assert len(warnings) == 2
+        assert any("'foo'" in w for w in warnings)
+        assert any("'bar'" in w for w in warnings)
+
+    def test_yaml_parse_error(self, tmp_path):
+        from auto_approve import validate_spec
+        p = tmp_path / "spec.yml"
+        p.write_text("rules:\n  - allow: [unclosed\n")
+        warnings = validate_spec(p)
+        assert len(warnings) == 1
+        assert "YAML parse error" in warnings[0]

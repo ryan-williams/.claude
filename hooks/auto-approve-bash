@@ -21,7 +21,7 @@ import sys
 
 # Add hooks dir to path so we can import the engine
 sys.path.insert(0, str(Path(__file__).parent))
-from auto_approve import evaluate_command, load_rules, load_ssh_rules
+from auto_approve import evaluate_command, load_rules, load_ssh_rules, validate_spec
 
 LOG_FILE = Path.home() / ".claude" / "hooks" / "auto-approve.log"
 
@@ -34,14 +34,20 @@ def main():
 
     all_rules = []
     all_ssh_rules = []
+    warnings = []
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
     if project_dir:
         project_yml = Path(project_dir) / ".claude" / "hooks" / "auto-approve.yml"
+        warnings.extend(validate_spec(project_yml))
         all_rules.extend(load_rules(project_yml))
         all_ssh_rules.extend(load_ssh_rules(project_yml))
     global_yml = Path.home() / ".claude" / "hooks" / "auto-approve.yml"
+    warnings.extend(validate_spec(global_yml))
     all_rules.extend(load_rules(global_yml))
     all_ssh_rules.extend(load_ssh_rules(global_yml))
+
+    for w in warnings:
+        print(f"auto-approve warning: {w}", file=sys.stderr)
 
     decision = evaluate_command(command, rules=all_rules, ssh_rules=all_ssh_rules)
 
@@ -53,6 +59,8 @@ def main():
         label = decision or "ask"
         cmd_short = command[:120]
         with open(LOG_FILE, "a") as f:
+            for w in warnings:
+                f.write(f"{ts}  warn   {proj}  {w}\n")
             f.write(f"{ts}  {label:5s}  {proj}  {cmd_short}\n")
     except OSError:
         pass

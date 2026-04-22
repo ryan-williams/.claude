@@ -284,6 +284,9 @@ def split_shell_commands(command: str) -> list[str]:
 
 # ── Rule loading and matching ────────────────────────────────────
 
+RECOGNIZED_KEYS = {"rules", "ssh-rules"}
+
+
 def _load_yaml(path: Path) -> dict:
     """Load and parse a YAML spec file. Returns empty dict on failure."""
     if not path.is_file():
@@ -303,6 +306,39 @@ def load_rules(path: Path) -> list[dict]:
 def load_ssh_rules(path: Path) -> list[dict]:
     """Load SSH-specific rules from a YAML spec file."""
     return _load_yaml(path).get("ssh-rules", [])
+
+
+def validate_spec(path: Path) -> list[str]:
+    """Validate a spec file's structure. Returns human-readable warnings.
+
+    Empty list = no issues. Missing files are silently skipped (absence is fine).
+    Recognized top-level keys: 'rules', 'ssh-rules', and '_<name>' (anchor holders).
+    """
+    if not path.is_file():
+        return []
+    try:
+        data = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as e:
+        return [f"{path}: YAML parse error: {e}"]
+    if data is None:
+        return []
+    if not isinstance(data, dict):
+        return [
+            f"{path}: top-level is a {type(data).__name__}; expected a dict "
+            f"with 'rules:' / 'ssh-rules:' keys (no rules loaded)"
+        ]
+    warnings = []
+    for key in data:
+        if not isinstance(key, str):
+            warnings.append(f"{path}: non-string top-level key {key!r}")
+            continue
+        if key in RECOGNIZED_KEYS or key.startswith("_"):
+            continue
+        warnings.append(
+            f"{path}: unrecognized top-level key {key!r} "
+            f"(expected: 'rules', 'ssh-rules', or '_<name>' for anchors)"
+        )
+    return warnings
 
 
 # Commands that wrap another command. Each maps to how many args to skip
