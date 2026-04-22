@@ -439,9 +439,14 @@ def _match_trie(tokens: list[str], trie: dict) -> bool:
         elif isinstance(subtree, list):
             if not remaining:
                 return True
-            alternation = Alternation(subtree)
-            if alternation.matches(remaining[0]):
-                return True
+            for entry in subtree:
+                if not isinstance(entry, str):
+                    continue
+                entry_matchers = parse_pattern(entry)
+                if not entry_matchers or len(remaining) < len(entry_matchers):
+                    continue
+                if all(m.matches(t) for m, t in zip(entry_matchers, remaining)):
+                    return True
         elif isinstance(subtree, dict):
             if _match_trie(remaining, subtree):
                 return True

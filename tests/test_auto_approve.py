@@ -286,6 +286,19 @@ class TestMatchTrie:
         trie = {"pnpm": ["build", "test"]}
         assert not _match_trie(["npm", "test"], trie)
 
+    def test_multi_token_list_entry(self):
+        """List entries can be multi-token patterns, not just single-token alternations."""
+        trie = {"modal": ["volume list", "run scripts/*"]}
+        assert _match_trie(["modal", "volume", "list"], trie)
+        assert _match_trie(["modal", "run", "scripts/foo.py", "--steps", "20"], trie)
+        assert not _match_trie(["modal", "deploy"], trie)
+        assert not _match_trie(["modal", "volume", "delete"], trie)
+
+    def test_multi_token_list_entry_with_glob(self):
+        trie = {"modal": ["run scripts/*"]}
+        assert _match_trie(["modal", "run", "scripts/train.py"], trie)
+        assert not _match_trie(["modal", "run", "other/train.py"], trie)
+
 
 # ── Rule matching ────────────────────────────────────────────────
 
