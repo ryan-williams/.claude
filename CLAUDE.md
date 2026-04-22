@@ -90,6 +90,9 @@ I use these acronyms and abbreviations:
 - SA = surface area, BSA = bug surface area
 - RC = root cause, RCF = root cause and fix (verb / command)
 - DL(s) = debug log(s)
+- ao = and/or
+- t10n = tokenization
+- n12e = noninteractive
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
