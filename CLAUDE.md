@@ -53,7 +53,7 @@ I use these acronyms and abbreviations:
 - DS = downstream, US = upstream (for dependencies, data flow, etc.)
   - Sometimes, DS = dataset.
 - LJ = left-justified, similarly RJ (right), CJ (center)
-- CF = Cloudflare
+- CF = Cloudflare, CFW = Cloudflare Worker, D1 = Cloudflare's SQLite-based serverless database, CFP = Cloudflare Pages
 - py = python, ts = typescript, js = javascript
 - TFFP = Test-Fail-Fix-Pass: if I say this, I want you to:
   1. Add a test that repros an issue (with no fix applied)
@@ -63,7 +63,7 @@ I use these acronyms and abbreviations:
 - r13y = reproducibility
 - IDP = idempotent, IDPy = idempotency.
   - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
-- GH = GitHub, GL = GitLab, GHA = GitHub Actions
+- GH = GitHub, GL = GitLab, GHA = GitHub Actions, GHP = GitHub Pages, GL = GitLab, GLP = GitLab Pages
 - "nop" = no-op
 - OM / OoM = order of magnitude
 - SE = side effect
@@ -77,7 +77,7 @@ I use these acronyms and abbreviations:
   - TT = tooltip
   - HB = Hover Box (a.k.a. Tooltip, but on plots)
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
-- DM or DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
+- DT / DM / DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 - AA = auto-approve (see below), AAG = auto-approve globally
 - a2a = "apples to apples"
 - WB = wandb = Weights & Biases
@@ -86,13 +86,14 @@ I use these acronyms and abbreviations:
 - fp = force-push, afp = amend (or autosquash) + force-push
 - asq = autosquash
 - utd = up to date
+- DA = data augmentation
 - acas = atomic compare and swap
 - SA = surface area, BSA = bug surface area
 - RC = root cause, RCF = root cause and fix (verb / command)
 - DL(s) = debug log(s)
 - ao = and/or
 - t10n = tokenization
-- n12e = noninteractive
+- n12e = NAI = noninteractive, IA = interactive
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
@@ -307,6 +308,7 @@ Several tools I often use while developing other applications and libraries:
 
 And a few libraries I often use in JS/TS apps:
 - [`use-kbd`] (https://github.com/runsascoded/use-kbd): Omnibars, editable hotkeys, search, and keyboard-navigation for React apps.
+  - SpeedDial ("SD") is a lower-right widget I usually add to my apps: search icon + caret on top to expand other buttons (GH link, theme cycler, ShortcutsModal button) 
 - [`use-prms`] (https://github.com/runsascoded/use-prms): React hooks for managing URL query parameters with type-safe encoding/decoding
 
 [`use-kbd`]: https://www.npmjs.com/package/use-kbd
