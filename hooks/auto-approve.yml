@@ -259,8 +259,16 @@ rules:
       gws auth: [status]
       gws docs documents: [get]
       gws drive comments: [list]
+      gws schema: ~
+      gws slides presentations: [get]
+      gws slides presentations pages: [get]
       gws --help: ~
+      modal app: [list]
+      modal billing: [report, --help]
       modal volume: [list, ls]
+      modal --help: ~
+      gcloud projects: [list]
+      gcloud config: [list]
 
 # ── SSH remote command rules ───────────────────────────────────────
 # These are evaluated INSTEAD OF the main rules for commands inside
