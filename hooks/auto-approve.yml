@@ -273,10 +273,11 @@ rules:
       gws --help: ~
       modal app: [list]
       modal billing: [report, --help]
-      modal volume: [list, ls]
+      modal volume: [list, ls, get]
       modal --help: ~
       gcloud projects: [list]
       gcloud config: [list]
+      gcloud storage: [ls, hash]
       gcloud storage buckets: [list]
 
 # ── SSH remote command rules ───────────────────────────────────────
