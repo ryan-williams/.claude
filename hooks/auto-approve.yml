@@ -220,6 +220,14 @@ rules:
       aws sts: [get-caller-identity]
   - allow-regex: '^aws (logs |ec2 describe-)'
 
+  # ── SLURM (read-only) ───────────────────────────────────────────
+  - allow:
+    - sacct
+    - scontrol show
+    - sinfo
+    - squeue
+    - sstat
+
   # ── Other tools ────────────────────────────────────────────────
   - allow:
     - brew
