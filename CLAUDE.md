@@ -80,6 +80,8 @@ I use these acronyms and abbreviations:
 - DT / DM / DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 - AA = auto-approve (see below), AAG = auto-approve globally
 - a2a = "apples to apples"
+- par = parallel
+- DL / UL = download / upload
 - WB = wandb = Weights & Biases
 - RO = read-only, RW = read-write
 - st = something, ost = or something
