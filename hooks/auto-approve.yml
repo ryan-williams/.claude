@@ -277,6 +277,7 @@ rules:
       modal --help: ~
       gcloud projects: [list]
       gcloud config: [list]
+      gcloud storage buckets: [list]
 
 # ── SSH remote command rules ───────────────────────────────────────
 # These are evaluated INSTEAD OF the main rules for commands inside
