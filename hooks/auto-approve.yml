@@ -199,11 +199,13 @@ rules:
       pnpm --dir *: *pnpm-subcmds
       pnpm -F *: *pnpm-subcmds
       pnpm --filter *: *pnpm-subcmds
-      pnpm exec: &pnpm-exec-subcmds [playwright, tsc]
+      pnpm exec: &pnpm-exec-subcmds [playwright, scrns, tsc, vite]
       pnpm -C * exec: *pnpm-exec-subcmds
       pnpm --dir * exec: *pnpm-exec-subcmds
       pnpm -F * exec: *pnpm-exec-subcmds
       pnpm --filter * exec: *pnpm-exec-subcmds
+      pnpm -r exec: *pnpm-exec-subcmds
+      pnpm -r * exec: *pnpm-exec-subcmds
       npm: [install, pack, run, search, test, view]
       npx: [eslint, playwright, scrns, tsc, tsx, vite, vitest]
   - allow-regex: '(^|/)tsc( |$)'
@@ -279,6 +281,10 @@ rules:
       gcloud config: [list]
       gcloud storage: [ls, hash]
       gcloud storage buckets: [list]
+      gsutil: [ls]
+      iris --cluster=*:
+        job: [describe, list, logs, summary, --help]
+        job run: [--help]
 
 # ── SSH remote command rules ───────────────────────────────────────
 # These are evaluated INSTEAD OF the main rules for commands inside
