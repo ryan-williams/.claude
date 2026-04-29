@@ -14,8 +14,9 @@
 - FSR, your environment seems to strip token env vars when you try to set them inline on bash commands. In order to use token env vars, you need to access them from within a script wrapper (e.g. a python script).
 
 ## Acronyms / Shorthands
-I use these acronyms and abbreviations:
-- WT: Git worktree
+I use these acronyms and abbreviations (generally case-insensitive):
+
+- WT: Git worktree (often in the sense of "tracked dir with a Git object hash based on recursive hash of its tracked files", not just the `git worktree` subcommand)
 - UCs: Uncommitted Changes (staged and unstaged)
 - SCs: Staged Changes (Git index)
 - USCs: UnStaged Changes
@@ -31,20 +32,24 @@ I use these acronyms and abbreviations:
 - BM = benchmark
 - HS = Hammerspoon (macOS automation tool I use)
 - WA = workaround
+- dt = desktop, mb = mob = mobile
 - uty = up to you
+- sf = straightforward
 - PoLS = Principle of Least Surprise
 - AR = aspect ratio (a.k.a. "dims" for "dimensions")
 - HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless), PW = PlayWright (usual HLB library of choice), PPTR = Puppeteer (another HLB library)
 - SFs = significant figures / sig-figs
-- sg = sounds good
+- sg = sounds good, ga = go ahead
 - EB = exponential backoff
 - BTS = behind the scenes
 - desc = description
 - CIC = check in chrome; use the MCP integration and verify the UI/UX being discussed, in a live browser
 - SM = submodule (as in Git)
 - gt = ground truth
+- CP = checkpoint
 - RG = regenerate
 - OB = omnibar
+- CB = checkbox, RB = radio button, TB = text box (form input elements)
 - HR = human-readable
 - LHS / RHS = {left,right}-hand side
 - GU = GPU utilization
@@ -80,10 +85,12 @@ I use these acronyms and abbreviations:
 - DT / DM / DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 - AA = auto-approve (see below), AAG = auto-approve globally
 - a2a = "apples to apples"
-- par = parallel
+- par = parallel, EP = embarrassingly parallelizable
 - DL / UL = download / upload
+- CL = context length, CW = context window (for language models)
 - WB = wandb = Weights & Biases
 - RO = read-only, RW = read-write
+- EM = envelope math (approximations); NM = napkin-math
 - st = something, ost = or something
 - fp = force-push, afp = amend (or autosquash) + force-push
 - asq = autosquash
@@ -95,7 +102,9 @@ I use these acronyms and abbreviations:
 - DL(s) = debug log(s)
 - ao = and/or
 - t10n = tokenization
-- n12e = NAI = noninteractive, IA = interactive
+- n12e = NAI = NI = noninteractive, IA = interactive
+- AP = anti-pattern
+- ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
