@@ -30,6 +30,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - MD = metadata (or Markdown)
 - BP = boilerplate
 - BM = benchmark
+- CA = content-address{ed,ing} (a.k.a. hash-based)
 - HS = Hammerspoon (macOS automation tool I use)
 - WA = workaround
 - dt = desktop, mb = mob = mobile
