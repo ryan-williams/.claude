@@ -54,8 +54,10 @@ _ssh_safe_cmds: &ssh-safe-cmds
 _ssh_safe_git: &ssh-safe-git
   - branch
   - diff
+  - for-each-ref
   - log
   - ls-files
+  - ls-remote
   - ls-tree
   - merge-base
   - reflog
@@ -83,6 +85,11 @@ rules:
       git -C *: *ssh-safe-git
   - allow:
       git: *ssh-safe-git
+
+  # Pushes to dev-node remotes (single-letter SSH aliases) are safe;
+  # GitHub/GitLab pushes still ask. Use regex so bare `git push` (with
+  # no remote) still asks — `git push: [e]` would auto-allow the prefix.
+  - allow-regex: '^git push e( |$)'
 
   # ── GitHub / GitLab CLI ────────────────────────────────────────
   - ask-regex: '^gh api .*(-X |--method |-f |-F |--input |--raw-field )'
@@ -192,14 +199,14 @@ rules:
     - node
     - node -e
   - allow:
-      pnpm: &pnpm-subcmds [add, approve-builds, audit, build, bundle, clean, config, create, dev, info, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, tsc, typecheck, update, vitest, why]
+      pnpm: &pnpm-subcmds [add, approve-builds, audit, build, bundle, clean, config, create, dev, info, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, "test:*", tsc, typecheck, update, vitest, why]
       pnpm -s: *pnpm-subcmds
       pnpm --silent: *pnpm-subcmds
       pnpm -C *: *pnpm-subcmds
       pnpm --dir *: *pnpm-subcmds
       pnpm -F *: *pnpm-subcmds
       pnpm --filter *: *pnpm-subcmds
-      pnpm exec: &pnpm-exec-subcmds [playwright, scrns, tsc, vite]
+      pnpm exec: &pnpm-exec-subcmds [playwright, scrns, tsc, vite, vitest]
       pnpm -C * exec: *pnpm-exec-subcmds
       pnpm --dir * exec: *pnpm-exec-subcmds
       pnpm -F * exec: *pnpm-exec-subcmds
@@ -252,6 +259,7 @@ rules:
     - "yes"
   - allow:
       dvx: [add, diff, import-url, run, status, version, --help]
+      rclone: [ls, lsd, lsf, lsl, listremotes, size, tree]
   - allow-regex: '^curl (-s )?https?://localhost[:/]'
 
   # ── Project helpers ────────────────────────────────────────────
