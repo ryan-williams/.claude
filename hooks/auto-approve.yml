@@ -247,6 +247,7 @@ rules:
     - git-didi
     - gs
     - juq
+    - kill-port
     - ln
     - magick
     - mdcmd

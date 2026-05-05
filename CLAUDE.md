@@ -281,6 +281,7 @@ uv sync          # Sync dependencies
   - A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
 - Check whether there's a server running on the desired port before starting any server and, if so, warn and prompt me.
   - Sometimes this will be a dev server I am running in the project, meaning you don't have to boot your own.
+- To kill a listener on a port, prefer `kill-port` (`kp`; in `~/.rc/net/`) over inlining `kill $(lsof -tiTCP:<port> ...)`. Bare `kill-port` auto-detects this project's port from `package.json` `.devPort`, `vite.config.{ts,js,mts,cts}`, or a `.dev-port` file. Explicit form: `kill-port <port> [<port>...]`. Globally AA'd (no prompt).
 - Similar to Python, I like to not have module-name boilerplate inline in code, where possible, so e.g. I like a line like this up near file imports: `const { abs, floor, round } = Math`, then there's no `Math.…` boilerplate in the rest of the file.
 
 My `vite.config.ts` will usually do something like:
