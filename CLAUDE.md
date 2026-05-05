@@ -6,12 +6,22 @@
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
   - `curl`s should write their outputs to a local file, then read from there (more like typical `wget` usage). You shouldn't have to `curl` the same file twice in quick succession / if you're not expecting it to have changed.
 - I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
-- When I want a Claude session in one project to make changes in another project, I will have a separate session run in that project. I avoid having multiple Claude sessions active in any given project/directory. The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there:
-  - Write into `specs/` in the root dir of the target project. After src project writes spec, it's easiest for me to `gs` in the dst project to find the new, untracked spec file.
-  - In the target project, I usually commit the initial `specs/….md` before starting to implement. Another option is to just stage it. Both approaches allow for editing the spec as implementation proceeds, and decide whether to commit/snapshot the original state of the spec (vs in-progress or done state).
-  - When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
-  - If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
 - FSR, your environment seems to strip token env vars when you try to set them inline on bash commands. In order to use token env vars, you need to access them from within a script wrapper (e.g. a python script).
+
+### "Spec" Workflow for Cross-Project Changes
+When I want a Claude session in one project to make changes in another project, I will typically have a separate session run in that project (I avoid having multiple Claude sessions active in any given project/directory).
+
+The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there:
+- Write into `specs/` in the root dir of the target project.
+  - After src project writes spec, it's easiest for me to `gs` in dst project to find the new, untracked spec file.
+  - In the target ("dst") project, I usually commit the initial `specs/….md` before starting to implement. Another option is to just stage it. Both approaches allow for editing the spec as implementation proceeds, and decide whether to commit/snapshot the original state of the spec (vs in-progress or done state).
+- When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
+- If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
+
+### "Issues" workflow for tracking intra-repo work
+Some projects will choose to use GitHub issues instead of `spec/{,done/}*.md` files.
+
+They should be managed with `ghpr` in local `gh/` subdirs. Drafts / Unfiled issues can go in `gh/drafts/<slug>.md` and then will become `gh/XXX/` once "pushed"/filed/created.
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations (generally case-insensitive):
