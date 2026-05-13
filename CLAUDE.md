@@ -79,6 +79,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - r13y = reproducibility
 - IDP = idempotent, IDPy = idempotency.
   - I'll often be referring to jobs which, when re-run, should either 1) realize they don't need to RG, and short-circuit, or 2) RG and produce byte-identical outputs. RGIP can specifically mean the latter.
+- RT = real-time (or round-trip — e.g. encode→decode, serialize→deserialize, tokenize→detokenize; often paired with IDP)
 - GH = GitHub, GL = GitLab, GHA = GitHub Actions, GHP = GitHub Pages, GL = GitLab, GLP = GitLab Pages
 - "nop" = no-op
 - OM / OoM = order of magnitude
@@ -114,6 +115,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - ao = and/or
 - t10n = tokenization
 - n12e = NAI = NI = noninteractive, IA = interactive
+- h11n = harmonization
 - AP = anti-pattern
 - ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law
 
