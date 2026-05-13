@@ -55,6 +55,7 @@ _ssh_safe_git: &ssh-safe-git
   - branch
   - diff
   - for-each-ref
+  - hash-object
   - log
   - ls-files
   - ls-remote
@@ -224,9 +225,13 @@ rules:
 
   # ── AWS (read-only) ───────────────────────────────────────────
   - allow:
-      aws s3: [ls]
-      aws s3api: [get-bucket-cors, get-bucket-policy, get-public-access-block, head-object]
-      aws sts: [get-caller-identity]
+      aws s3: &aws-s3-safe [ls]
+      aws s3api: &aws-s3api-safe [get-bucket-cors, get-bucket-policy, get-public-access-block, head-object]
+      aws sts: &aws-sts-safe [get-caller-identity]
+      aws --profile *:
+        s3: *aws-s3-safe
+        s3api: *aws-s3api-safe
+        sts: *aws-sts-safe
   - allow-regex: '^aws (logs |ec2 describe-)'
 
   # ── SLURM (read-only) ───────────────────────────────────────────
@@ -261,7 +266,7 @@ rules:
   - allow:
       dvx: [add, diff, import-url, run, status, version, --help]
       rclone: [ls, lsd, lsf, lsl, listremotes, size, tree]
-  - allow-regex: '^curl (-s )?https?://localhost[:/]'
+  - allow-regex: '^curl (-[sSIfLk]+ )?https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)[:/]'
 
   # ── Project helpers ────────────────────────────────────────────
   - allow:
@@ -291,9 +296,12 @@ rules:
       gcloud storage: [ls, hash]
       gcloud storage buckets: [list]
       gsutil: [ls]
-      iris --cluster=*:
+      iris: &iris-subcmds
+        cluster: [list]
         job: [describe, list, logs, summary, --help]
         job run: [--help]
+      iris --cluster=*: *iris-subcmds
+      iris --cluster *: *iris-subcmds
 
 # ── SSH remote command rules ───────────────────────────────────────
 # These are evaluated INSTEAD OF the main rules for commands inside
