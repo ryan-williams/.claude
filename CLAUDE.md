@@ -7,6 +7,7 @@
   - `curl`s should write their outputs to a local file, then read from there (more like typical `wget` usage). You shouldn't have to `curl` the same file twice in quick succession / if you're not expecting it to have changed.
 - I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
 - FSR, your environment seems to strip token env vars when you try to set them inline on bash commands. In order to use token env vars, you need to access them from within a script wrapper (e.g. a python script).
+- **Prefer CLI subcommands over ad-hoc scripts** when the logic is plausibly reusable. If you're writing a one-shot Python/Bash script with pluggable inputs (paths, run IDs, dates, etc.), check whether it could land as a subcommand of an existing project CLI (e.g. `tomat <sub>`, `ctbk <sub>`, `dffs <sub>`) — or as a new CLI if no fit exists. Benefits: (1) easier to review iteratively (one CLI surface, not many one-offs), (2) easier to auto-approve patterns (one AA rule per cmd vs many), (3) saves recreating the same logic across sessions. Truly one-shot scripts are fine; consider whether a similar invocation will recur before deciding.
 
 ### "Spec" Workflow for Cross-Project Changes
 When I want a Claude session in one project to make changes in another project, I will typically have a separate session run in that project (I avoid having multiple Claude sessions active in any given project/directory).
@@ -295,6 +296,7 @@ uv sync          # Sync dependencies
   - Sometimes this will be a dev server I am running in the project, meaning you don't have to boot your own.
 - To kill a listener on a port, prefer `kill-port` (`kp`; in `~/.rc/net/`) over inlining `kill $(lsof -tiTCP:<port> ...)`. Bare `kill-port` auto-detects this project's port from `package.json` `.devPort`, `vite.config.{ts,js,mts,cts}`, or a `.dev-port` file. Explicit form: `kill-port <port> [<port>...]`. Globally AA'd (no prompt).
 - Similar to Python, I like to not have module-name boilerplate inline in code, where possible, so e.g. I like a line like this up near file imports: `const { abs, floor, round } = Math`, then there's no `Math.…` boilerplate in the rest of the file.
+- **OG image convention**: serve the project's `og:image` at the site root as `/og.jpg` (jpg preferred over png — ~half the size at q=85, no visible loss for screenshots). In Vite projects this means putting it at `public/og.jpg` (or `<site-pkg>/public/og.jpg` in a workspace). Reference it from `index.html` via `<meta property="og:image" content="https://<host>/og.jpg" />`, and from the README as a relative path (e.g. `site/public/og.jpg`). Use `sips -s format jpeg -s formatOptions 85 in.png --out og.jpg` to convert.
 
 My `vite.config.ts` will usually do something like:
 
