@@ -244,6 +244,11 @@ class TestUnwrapCommand:
         assert cmd == "echo test"
         assert host is None
 
+    def test_multi_env_prefix(self):
+        cmd, host = _unwrap_command("FOO=1 BAR=2 BAZ=3 echo test")
+        assert cmd == "echo test"
+        assert host is None
+
     def test_ssh_simple(self):
         cmd, host = _unwrap_command('ssh myhost "ls -la /foo"')
         assert cmd == "ls -la /foo"

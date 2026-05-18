@@ -431,8 +431,7 @@ def _unwrap_command(command: str) -> tuple[str, str | None]:
         return m.group(1), None
     if re.match(r'^[A-Za-z_]\w*=\S*\s*$', cmd):
         return "", None
-    m = re.match(r'^[A-Za-z_]\w*=\S*\s+(.+)$', cmd)
-    if m:
+    while m := re.match(r'^[A-Za-z_]\w*=\S*\s+(.+)$', cmd):
         cmd = m.group(1)
 
     if cmd.startswith("ssh "):
