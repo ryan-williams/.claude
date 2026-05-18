@@ -266,7 +266,8 @@ rules:
   - allow:
       dvx: [add, diff, import-url, run, status, version, --help]
       rclone: [ls, lsd, lsf, lsl, listremotes, size, tree]
-  - allow-regex: '^curl (-[sSIfLk]+ )?https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)[:/]'
+  - allow-regex: '^curl (\S+\s+)*?["'']?https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)[:/]'
+  - allow-regex: '^iris (--cluster[= ]\S+ )?query "?(SELECT|PRAGMA|WITH)\b'
 
   # ── Project helpers ────────────────────────────────────────────
   - allow:
