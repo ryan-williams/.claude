@@ -129,11 +129,19 @@ I use these acronyms and abbreviations (generally case-insensitive):
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
+## Verifying UI/UX changes (CIC)
+
+For web/UI projects with a local dev server:
+
+- **CIC by default**: when a change has a visible effect (rendered UI, new route, layout/style tweak, etc.), use the `claude-in-chrome` MCP to load the relevant URL and verify the rendered behavior before returning control. Static reads, type-checks, and test runs do not substitute for actually rendering the UI — they tell you the code is well-formed, not that the feature works.
+- **Include the URL when returning control**: emit a raw URL or markdown anchor-text link to the dev-server path that exercises the change, so I can re-verify the same view. If multiple paths or modes are relevant (different routes, different ports, prod-build vs. dev-server, etc.), list them all and note which exercises what.
+- If you can't CIC (no MCP, no dev server up, can't start one), say so — don't claim to have verified what you only inferred from code.
+
 ## Git Usage Conventions
 - **Avoid `git add -A`**: I often have persistent untracked files and directories I don't want to commit. `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
 - Similarly, **don't use `git clean -fd`** or similar; I often have untracked files/dirs that are important and I want to keep.
 - Don't `git commit` changes unless I've told you to (on a per-session basis).
-- Don't write to global `/tmp` dirs, use local/relative `tmp/...` subdirs instead.
+- Use local/relative `tmp/<descriptive-name>` for scratch files (relative to the project root or whatever working dir you're in) — **never** `/tmp/<anything>`. My global `core.excludesfile` excludes `tmp/`. Same for `Bash` invocations that `cd` into a scratch dir to reproduce something: build it under the project's `tmp/`, not under `/tmp/`.
 - I always configure a `git config --global core.excludesfile` (usually `~/git/ignore`) excluding common patterns that it's safe to assume should be ignored, anytime they appear / across all projects (e.g. `tmp`, `node_modules`, `.envrc`, …). Don't add `.gitignore` files to projects with "boilerplate" patterns like that.
   - Only use project- or dir-specific `.gitignore` files if there are patterns that reasonably might be tracked in _some_ projects (e.g.… `docs`? IME it almost never happens).
   - Otherwise, prefer delegating to the global `core.excludesfile`.
