@@ -266,12 +266,7 @@ uv sync          # Sync dependencies
 - `import` members directly (e.g. `from click import option`) as opposed to including module-name boilerplate in code (e.g. `click.option`)
 - Use trailing commas in argument lists, multi-line imports, etc.
 - Unexpected/Error states should `raise`; don't suppress errors (with `try`/`except` or `if`/`else`) unless they're legitimate states, where both branches can be explained as valid/expected code paths (in which case they should both be documented as such).
-- **Testing**: Don't use vague membership assertions like `assert expected_substring in actual_string` or `assert elem in array`. Use precise matching instead:
-  - Exact string/array equality
-  - Match arrays of string lines
-  - Robust regex matching
-  - Specific element-by-element assertions
-  - Other precise assertions that clearly document expected values
+- See **Testing** section below for assertion style rules — tests read as specs, no vague `in`/`not in` substring checks.
 - Scripts should use a `uv run` shebang line, and include any required dependencies:
   - Use `click` for CLIs:
     - Each `@option(...)` and `@argument(...)` should be on one line; don't put the `help="..."` string on a separate line from the decorator.
@@ -284,6 +279,75 @@ uv sync          # Sync dependencies
       - `flag` replaces `@click.option(..., is_flag=True)`)
   - Log statements should go to stderr (using `err`); use stdout for primary / pipe-able / parse-able output.
   - Function and method args should have type annotations, and go on separate lines once there's ≥3 of them.
+
+## Testing
+
+**Before writing or modifying any test assertion, read this section.** Past sessions kept defaulting to `assert <substring> in <output>` because it's the path of least resistance; this is the hook to stop and factor a precise assertion instead.
+
+### The rule
+
+Tests are **specs of behavior**: "this function does *exactly* this, produces *exactly* this." A reader scanning a test should see the expected output literally; a regression that flips one token in the output should make the test fail loudly. Vague membership assertions destroy both properties — `assert "foo" in output` says nothing about what else is in `output` and silently tolerates "foo bar" → "foo qux".
+
+**Never** use `assert <substring> in <text>` or `assert <elem> in <list>` as a *primary* assertion. This applies to: `result.output`, `result.stdout`, `result.stderr`, subprocess output, file contents, log capture, parsed JSON dicts, etc.
+
+A `not in` as a *secondary* sanity check (e.g. "and no error was logged") *alongside* a precise primary assertion is OK. A bare `in`/`not in` is not.
+
+### Patterns to use instead
+
+1. **Exact equality** — `assert actual == expected_string` or `assert actual_list == expected_list`. For multi-line output, split into lines and compare lists:
+   ```python
+   assert result.output.rstrip().split("\n") == [
+       "Running stage foo",
+       "  ✓ foo: completed",
+       "Summary: 1 stage, 0 failed",
+   ]
+   ```
+2. **Normalize variable parts then assert equality.** Strip / regex-replace durations, timestamps, paths, error strings from downstream tools — leave a placeholder so shape and remaining content still get compared:
+   ```python
+   normalized = re.sub(r"\(\d+\.\d+s\)", "(<duration>)", result.output)
+   assert normalized.split("\n") == ["  ✓ foo: completed (<duration>)", ...]
+   ```
+3. **Parse into structured form**, assert on the structure. Build a `@dataclass` (e.g. `Stage(name, kind)`) and a parser helper; the test asserts `parse(output) == [Stage("foo", "completed"), Stage("bar", "co-output")]`. Especially useful when multiple tests assert similar shapes (the parser factors out the shared work).
+4. **Sorted / set-based assertions for race-dependent output.** When threading order is non-deterministic, sort the parsed structure before comparing — don't `in` your way out of the race:
+   ```python
+   stages = sorted(parse(output), key=lambda s: s.name)
+   assert stages == [Stage("a", "completed"), Stage("b", "co-output")]
+   ```
+5. **Golden files for very large outputs.** Read `tests/golden/<test_name>.txt` and `assert actual == golden`. Provide a `pytest --update-golden` style flag if regeneration is frequent.
+6. **Interpolation for shared shape, per-test deltas.** Build expected output via `f"...{var}..."` from a helper, vary the bits each test changes. Treat tests like code — DRY shared shape, sharpen per-test delta.
+
+### Anti-patterns
+
+```python
+# NO — substring; says nothing about what else printed; tolerates regressions
+assert "co-output ready" in result.output
+# NO — count-based hack to dodge ordering issues without parsing
+assert result.output.count("foo") == 2
+# NO — `or` of substrings to dodge race-dependent output
+assert "branch A" in result.output or "branch B" in result.output
+# NO — `in` against a parsed dict
+assert "name" in parsed_json
+```
+
+```python
+# OK — parsed → sorted → equality
+assert sorted(parse(result.output), key=lambda s: s.name) == [
+    Stage("a.txt", "completed"),
+    Stage("b.txt", "co-output"),
+]
+# OK — exact list equality
+assert sorted(remote.glob("files/md5/*/*")) == [...]
+# OK — exact dict equality
+assert parsed_json == {"name": "foo", "version": "1.2"}
+```
+
+### Before adding an `in` assertion, ask
+
+- Could a regression that *adds* extra output past my matched substring still let this test pass? If yes, I'm leaving a false-negative window — parse + equality instead.
+- Could a regression that *removes* matched output be masked because other output also contains the substring? If yes, parse + equality.
+- Is this an `or`-chain across substrings because the output is race-dependent? Sort the parsed structure instead.
+
+If none of the patterns above apply and `in` genuinely is the right tool (rare — usually means you haven't tried hard enough to parse), leave a comment explaining why.
 
 ## Jupyter Notebooks
 [`juq.py`] ([gh][juq gh], likely `$c/juq`) has cmds I frequently use with notebooks, especially for executing them in-place (wrapping [Papermill]), preserving indentation, normalizing std{out,err}, stripping `execution` metadata, etc. Use `juq papermill ...` instead of e.g. `jupyter nbconvert` or `papermill` directly, for better consistency and to avoid common gotchas.
