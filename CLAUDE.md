@@ -65,12 +65,14 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - HR = human-readable
 - LHS / RHS = {left,right}-hand side
 - GU = GPU utilization
+- pqt = parquet, ppd = predicate push-down
 - idk = I don't know, idr = I don't remember, idt = I don't think, …
 - sq = status quo
 - DS = downstream, US = upstream (for dependencies, data flow, etc.)
   - Sometimes, DS = dataset.
 - LJ = left-justified, similarly RJ (right), CJ (center)
 - CF = Cloudflare, CFW = Cloudflare Worker, D1 = Cloudflare's SQLite-based serverless database, CFP = Cloudflare Pages
+- CFN = cloud functions (generic; e.g. AWS Lambda, Google Cloud Functions, Cloudflare Workers, etc.)
 - py = python, ts = typescript, js = javascript
 - TFFP = Test-Fail-Fix-Pass: if I say this, I want you to:
   1. Add a test that repros an issue (with no fix applied)
@@ -93,7 +95,12 @@ I use these acronyms and abbreviations (generally case-insensitive):
   - vp / vh / vw = viewport, viewport height, viewport width
   - LIs = legend items
   - TT = tooltip
+  - LB = Light Box (image preview modal)
   - HB = Hover Box (a.k.a. Tooltip, but on plots)
+  - DT = DevTools (in Chrome)
+    - DTM = DevTools "Mobile mode", used for testing touch devices and narrower viewports
+    - DTN = DevTools "Network" tab
+    - DTC = DevTools console (where `console.log`s appear)
 - In general SS can also mean "screenshot", and "cast" = "screencast" (screen recording).
 - DT / DM / DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 - AA = auto-approve (see below), AAG = auto-approve globally
