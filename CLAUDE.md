@@ -125,7 +125,8 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - n12e = NAI = NI = noninteractive, IA = interactive
 - h11n = harmonization
 - AP = anti-pattern
-- ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law
+- ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law, RE = reconstruction loss/error (lossy-codec / autoencoder reconstruction quality), VV = VQ-VAE (vector-quantized variational autoencoder)
+- WR = with replacment, WOR = without replacement (i.e. when sampling from a distribution)
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
