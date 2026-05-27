@@ -123,6 +123,29 @@ If `Disk:8` produces a mask with a too-low mean (interior holes still flagged as
 - Mean too high (outside region eaten) → smaller disk (`Disk:4`, `Disk:6`) or skip the close entirely
 - `Disk:30` is almost always too aggressive — back off
 
+### 2d. Flat raster logos — rebuild from solid color, don't flood-fill the original
+
+When the input is a *raster* (PNG/webp/JPG) flat logo — a couple of solid colors on a solid background — do **not** background-remove by flood-filling the original's alpha. The original's antialiased edge pixels are color↔background *blends*; flood-fill only removes pixels close to the background color, leaving the mid-blend pixels opaque as a visible **halo** (a light fringe of the blended color, very obvious on Slack's dark theme).
+
+Instead, rebuild the logo from solid color:
+
+1. Threshold the (grayscaled) image to a clean 2-tone, build a **silhouette mask** (the whole logo outline incl. enclosed counters) via the flood-fill recipe in 2c.
+2. If the logo has enclosed white counters (the hole in a "b"/"o"/"a", etc.) that must read as white on the final, build a second **counter mask**: same flood-fill, but stop after `-fill black -opaque "rgb(128,128,128)"` so only the still-white enclosed region survives.
+3. Composite a solid-color result: `magick -size WxH xc:"<logo-color>" \( -size WxH xc:white \) counter-mask.png -compose over -composite` — solid logo color with white punched in at the counters.
+4. Apply the silhouette mask as alpha: `magick solid.png silhouette-mask.png -alpha off -compose CopyOpacity -composite PNG32:clean.png`.
+
+Result: pure logo color, pure white counters, crisp haloless edges (the threshold's hard edge antialiases cleanly on the final downscale). Sample the body — it should be the *exact* brand color (`srgba(6,74,122,1)`), not a lightened blend.
+
+For dark, single-color marks (navy, black, dark green…) also produce a **white-badge variant**: composite the clean cutout over a white rounded-square (`-draw "roundrectangle 0,0 W-1,H-1 r,r"`), since the dark color alone is low-contrast on Slack's dark theme.
+
+### 2e. Other raster preprocessing routes
+
+When §2d's full color-rebuild is overkill, two quicker recipes for raster inputs:
+
+- **Solid background with enclosed same-color regions** (e.g. character/face art with white eyes, an "r"/"m" mark with white counters). Flood-fill *alpha* to none from all 4 corners with fuzz (`-fuzz 15-18%`). This removes only border-connected background pixels, leaving enclosed same-color regions intact. A global "white→transparent" would punch holes in those. Some halo may remain at antialiased edges; switch to §2d if it shows on dark theme.
+
+- **Already-transparent source with a baked-in glow/halo** (semi-transparent fringe around the logo, invisible on white preview, ugly on dark). A transparent input isn't automatically clean — preview on dark theme to check. Fix: re-flatten on white (`-background white -flatten`) so the glow merges to white, then rebuild alpha from inverse luminance (`-colorspace Gray -negate`, then `CopyOpacity` onto a solid-black canvas). Glow → white → transparent, leaving haloless ink.
+
 ### 3. Verify
 
 Always sample pixels at known interesting points:
@@ -151,9 +174,3 @@ Brief output to user: file path, dimensions, file size. If you produced two vari
 - **Border for flood-fill**: Always `-bordercolor X -border 2` before `-draw "color 0,0 floodfill"`, then `-shave 2x2`. This guarantees (0,0) is reachable and outside the original content area.
 - **Trim before extent**: Always `-trim +repage` before computing the square extent — otherwise the SVG's stray transparent padding offsets the centering.
 - **Final size**: Slack's hard cap is 128KB and 256×256 max for custom emoji. PNGs at 256² with reasonable detail come in well under 128KB; if one doesn't, drop to 192×192 or simplify the logo.
-
-## Examples (from prior sessions)
-
-- `whole-foods.svg` (Case 2): green disc with letter cutouts → `whole-foods-slack-white.png` via DstOver composite of disc under SVG render.
-- `zarr-pink-stacked.svg` top section (Case 3): cube cluster with gaps → `zarr-cubes-slack.png` (transparent) and `zarr-cubes-slack-white.png` (interior filled), used `-morphology Close Disk:8` + tri-state flood-fill.
-- `zipcar.svg` (Case 2 — initially mistaken for Case 1): single green path with the Z and motion lines cut out of it (no separate white path). Looks fine on Finder's white preview but the Z goes black on Slack's dark theme. Fixed by drawing a white disc at the SVG's circle (center 75,73.6 radius 62.7 in 150-unit viewBox) and DstOver-compositing the SVG render on top. Lesson: when the SVG has *one* colored path with internal holes (rather than colored-bg-path + white-foreground-path), it's Case 2 even though it might look like Case 1 at first glance.
