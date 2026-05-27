@@ -25,6 +25,7 @@ _ssh_safe_cmds: &ssh-safe-cmds
   - cd
   - cut
   - df
+  - diff
   - du
   - echo
   - env
@@ -84,6 +85,8 @@ rules:
         - init
         - mv
       git -C *: *ssh-safe-git
+      git worktree: [list]
+      git -C * worktree: [list]
   - allow:
       git: *ssh-safe-git
 
@@ -143,7 +146,12 @@ rules:
     - xxd
     - yq
     - zip
-  - allow: /usr/bin/(col|stat)
+  # Alternation inside a token (e.g. `/usr/bin/(col|stat)`) is not supported by
+  # the parser — it only recognizes `(a|b|c)` as a standalone token. Use two
+  # literal entries instead.
+  - allow:
+    - /usr/bin/col
+    - /usr/bin/stat
   - allow: "["
   - allow:
     - getent
@@ -200,7 +208,7 @@ rules:
     - node
     - node -e
   - allow:
-      pnpm: &pnpm-subcmds [add, approve-builds, audit, build, bundle, clean, config, create, dev, info, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, "test:*", tsc, typecheck, update, vitest, why, --version]
+      pnpm: &pnpm-subcmds [add, approve-builds, audit, build, bundle, clean, config, create, dev, e2e, info, install, lint, list, ls, outdated, rebuild, remove, run, scrns, search, start, tc, test, "test:*", tsc, typecheck, update, vitest, why, --version]
       pnpm -s: *pnpm-subcmds
       pnpm --silent: *pnpm-subcmds
       pnpm -C *: *pnpm-subcmds
@@ -217,6 +225,8 @@ rules:
       npm: [install, pack, run, search, test, view]
       npx: [eslint, playwright, scrns, tsc, tsx, vite, vitest]
   - allow-regex: '(^|/)tsc( |$)'
+  # wrangler: only read-only verbs (no `deploy`, `publish`, `d1 execute`, …).
+  - allow-regex: '^pnpm( (-[CFr]|--(dir|filter)) \S+)? exec wrangler (--version|--help|dev --help|whoami)( |$)'
 
   # ── Cargo / Rust ───────────────────────────────────────────────
   - allow:
@@ -262,6 +272,7 @@ rules:
     - pdfseparate
     - scrns
     - source
+    - "true"
     - "yes"
   - allow:
       dvx: [add, diff, import-url, run, status, version, --help]
@@ -280,6 +291,7 @@ rules:
     - pqc
     - pqn
     - pqs
+    - pqt2json
     - pqtl
   - allow:
       gws auth: [status]
