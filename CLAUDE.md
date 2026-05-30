@@ -34,6 +34,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - UFs / UTs: UnTracked Files (Git)
 - TP / FP / TN / FN: True Positive / False Positive / True Negative / False Negative
 - BC = backwards-compatibility (a.k.a. back-compat). Often I'm working on code that I've not pushed anywhere, and BC concerns would only have to do with other checkpoints in my current feature branch, where BC is not important, and is even negative-value (bc it adds needless code complexity). In such cases I might just say "forget BC" or similar.
+  - BIC = backwards-incompatible
 - DC = double-check or double-click
 - FFR = for future reference
 - RL = rate-limited / rate-limits
