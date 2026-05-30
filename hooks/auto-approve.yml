@@ -301,6 +301,8 @@ rules:
       gws slides presentations: [get]
       gws slides presentations pages: [get]
       gws --help: ~
+      # All read-only; mutating subs (prune, import, pg push) still ask.
+      agentsview: [health, projects, serve, statusline, sync, usage, --help, --version]
       modal app: [list]
       modal billing: [report, --help]
       modal secret: [list]
@@ -313,7 +315,7 @@ rules:
       gcloud iam roles: [list]
       gcloud storage: [ls, hash]
       gcloud storage buckets: [list]
-      gsutil: [ls]
+      gsutil: [cat, du, ls, stat]
       iris: &iris-subcmds
         cluster: [list]
         job: [describe, list, logs, summary, --help]
