@@ -249,6 +249,33 @@ class TestUnwrapCommand:
         assert cmd == "echo test"
         assert host is None
 
+    def test_git_no_pager_stripped(self):
+        cmd, host = _unwrap_command("git --no-pager status")
+        assert cmd == "git status"
+        assert host is None
+
+    def test_git_short_pager_flag_stripped(self):
+        cmd, host = _unwrap_command("git -P log --oneline")
+        assert cmd == "git log --oneline"
+        assert host is None
+
+    def test_git_both_pager_flags_stripped(self):
+        cmd, host = _unwrap_command("git --no-pager -P diff foo bar")
+        assert cmd == "git diff foo bar"
+        assert host is None
+
+    def test_git_no_pager_not_stripped_mid_command(self):
+        # --no-pager only stripped when adjacent to leading `git` token
+        cmd, host = _unwrap_command("git log --no-pager")
+        assert cmd == "git log --no-pager"
+        assert host is None
+
+    def test_git_no_pager_passthrough_then_match(self):
+        # End-to-end: `git --no-pager push` should match the same rule as `git push`
+        rules = [{"allow": "git push"}]
+        assert evaluate_command("git --no-pager push", rules) == "allow"
+        assert evaluate_command("git --no-pager status", rules) is None
+
     def test_ssh_simple(self):
         cmd, host = _unwrap_command('ssh myhost "ls -la /foo"')
         assert cmd == "ls -la /foo"

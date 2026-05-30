@@ -354,6 +354,13 @@ _WRAPPER_CMDS = {
     "ltrace": None,    # ltrace [-flags] cmd args...
 }
 
+# Passthrough flags: tokens that appear after a known leading command but don't
+# change its semantics for AA purposes. Stripped only when adjacent to the
+# leading command (so `git log --no-pager` is left alone).
+_PASSTHROUGH_FLAGS = {
+    "git": {"--no-pager", "-P"},
+}
+
 
 def _strip_wrappers(cmd: str) -> str:
     """Strip wrapper commands (nohup, timeout, time, etc.) to get the inner command.
@@ -433,6 +440,13 @@ def _unwrap_command(command: str) -> tuple[str, str | None]:
         return "", None
     while m := re.match(r'^[A-Za-z_]\w*=\S*\s+(.+)$', cmd):
         cmd = m.group(1)
+
+    m = re.match(r'^(\S+)\s+', cmd)
+    if m and m.group(1) in _PASSTHROUGH_FLAGS:
+        leader = re.escape(m.group(1))
+        flags_re = "|".join(re.escape(f) for f in _PASSTHROUGH_FLAGS[m.group(1)])
+        while m2 := re.match(rf'^({leader})\s+({flags_re})(?=\s)', cmd):
+            cmd = cmd[:m2.end(1)] + cmd[m2.end(2):]
 
     if cmd.startswith("ssh "):
         tokens = shlex_split_safe(cmd)
