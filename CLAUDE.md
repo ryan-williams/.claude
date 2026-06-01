@@ -117,6 +117,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - asq = autosquash
 - utd = up to date
 - DA = data augmentation
+- RA = rolling average (sliding-window mean)
 - acas = atomic compare and swap
 - SA = surface area, BSA = bug surface area
 - RC = root cause, RCF = root cause and fix (verb / command)
@@ -126,8 +127,11 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - n12e = NAI = NI = noninteractive, IA = interactive
 - h11n = harmonization
 - AP = anti-pattern
+- bk = bookkeeping
 - ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law, RE = reconstruction loss/error (lossy-codec / autoencoder reconstruction quality), VV = VQ-VAE (vector-quantized variational autoencoder)
 - WR = with replacment, WOR = without replacement (i.e. when sampling from a distribution)
+- BT = Boundary Triangle (in H3): the 6 small triangular slivers along each hex parent's edges where parent area and 7-children union geometrically differ. ~5% of parent area; ~7-8% of stations land in one BT or another per level transition. H3 docs ack the issue, library doesn't model BTs first-class (cellToParent is non-exact for points in a BT). For exact aggregation across resolutions, BTs need their own row-buckets or queries stay single-resolution.
+- H13 = ctbk's H3 variant where each parent has 13 disjoint subregions perfectly tiling it: 1 central child hex + 6 fringe children (hex minus outgoing BT) + 6 incoming BTs from sibling parents' children. SR area: 12/84 (central) + 6×11/84 (fringes) + 6×1/84 (incoming BTs) = 84/84. Addressing: `(parent_id, sr_idx ∈ 0..12)`. Lineage exact; monoid sums + query-time subtraction (`count(P) − Σ excluded SRs`) handle partial coverage without needing "all 13 children present" for compaction. See `~/c/pyrmts/specs/pluggable-spatial-backend.md`.
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
