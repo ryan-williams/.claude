@@ -303,8 +303,9 @@ rules:
       gws --help: ~
       # All read-only; mutating subs (prune, import, pg push) still ask.
       agentsview: [health, projects, serve, statusline, sync, usage, --help, --version]
-      modal app: [list]
+      modal app: [list, logs]
       modal billing: [report, --help]
+      modal call-logs: ~
       modal secret: [list]
       modal secret create: [--help]
       modal volume: [list, ls, get]
@@ -322,6 +323,8 @@ rules:
         job run: [--help]
       iris --cluster=*: *iris-subcmds
       iris --cluster *: *iris-subcmds
+  # `modal <sub...> --help` is always safe; catches all depths.
+  - allow-regex: '^modal( \S+){1,4} --help( |$)'
 
 # ── SSH remote command rules ───────────────────────────────────────
 # These are evaluated INSTEAD OF the main rules for commands inside
