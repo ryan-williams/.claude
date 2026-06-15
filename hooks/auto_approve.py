@@ -614,9 +614,14 @@ def evaluate_command(
     ANY segment 'ask' or None → None (normal prompt).
     """
     segments = split_shell_commands(command)
-    segments = [s for s in segments if s and not s.lstrip().startswith("#")]
+    non_empty = [s for s in segments if s]
+    segments = [s for s in non_empty if not s.lstrip().startswith("#")]
     if not segments:
-        return None
+        # Comment-only input: bash treats it as a no-op, so don't
+        # bother the user. Truly empty input falls back to "ask"
+        # (None) since that shouldn't happen in practice and is
+        # worth surfacing if it does.
+        return "allow" if non_empty else None
 
     if len(segments) == 1:
         body = _extract_compound_body(segments[0])

@@ -409,6 +409,17 @@ class TestEvaluateCommand:
     def test_comment_filtered(self, rules):
         assert evaluate_command("# this is a comment\necho hello", rules) == "allow"
 
+    def test_comment_only_allows(self, rules):
+        # Bash treats a comment-only command as a no-op; the engine
+        # should too, instead of asking the user to approve nothing.
+        assert evaluate_command("# What K=12 results exist on GCS for bin5?", rules) == "allow"
+        assert evaluate_command("# foo\n# bar", rules) == "allow"
+
+    def test_empty_input_asks(self, rules):
+        # Truly empty input is a no-op too but unusual; bubble it up.
+        assert evaluate_command("", rules) is None
+        assert evaluate_command("   \n  ", rules) is None
+
     def test_for_loop_body(self, rules):
         assert evaluate_command(
             'for x in 1 2; do echo $x; done',
