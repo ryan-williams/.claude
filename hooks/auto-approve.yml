@@ -316,7 +316,8 @@ rules:
       gcloud iam roles: [list]
       gcloud storage: [ls, hash]
       gcloud storage buckets: [list]
-      gsutil: [cat, du, ls, stat]
+      gsutil: &gsutil-safe [cat, du, ls, stat]
+      gsutil -q: *gsutil-safe
       iris: &iris-subcmds
         cluster: [list]
         job: [describe, list, logs, summary, --help]
