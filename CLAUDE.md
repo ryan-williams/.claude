@@ -66,6 +66,8 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - OB = omnibar
 - CB = checkbox, RB = radio button, TB = text box (form input elements)
 - HR = human-readable
+- ctx = context
+- CP = cherry-pick (esp. in Git ctxs)
 - LHS / RHS = {left,right}-hand side
 - GU = GPU utilization
 - pqt = parquet, ppd = predicate push-down
@@ -110,6 +112,8 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - a2a = "apples to apples"
 - par = parallel, EP = embarrassingly parallelizable
 - DL / UL = download / upload
+- imp = improvement, feat = feature
+- ioat = instead of or in addition to
 - CL = context length, CW = context window (for language models)
 - WB = wandb = Weights & Biases
 - RO = read-only, RW = read-write
