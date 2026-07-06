@@ -297,6 +297,7 @@ rules:
       gws auth: [status]
       gws docs documents: [get]
       gws drive comments: [list]
+      gws drive files: [get, list]
       gws schema: ~
       gws slides presentations: [get]
       gws slides presentations pages: [get]
@@ -314,7 +315,7 @@ rules:
       gcloud projects: [list]
       gcloud config: [list]
       gcloud iam roles: [list]
-      gcloud storage: [ls, hash]
+      gcloud storage: [ls, hash, cat]
       gcloud storage buckets: [list]
       gsutil: &gsutil-safe [cat, du, ls, stat]
       gsutil -q: *gsutil-safe
