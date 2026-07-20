@@ -6,6 +6,7 @@
       "WebSearch"
     ]
   },
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "PreToolUse": [
       {
@@ -27,8 +28,8 @@
   },
   "alwaysThinkingEnabled": true,
   "autoUpdatesChannel": "latest",
+  "tui": "fullscreen",
   "feedbackSurveyState": {
     "lastShownTime": 1754000331023
-  },
-  "tui": "fullscreen"
+  }
 }
