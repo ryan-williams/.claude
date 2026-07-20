@@ -5,9 +5,18 @@ description: Convert a logo (SVG or PNG) into a ≤256px square PNG suitable for
 
 # Logo → Slack emoji PNG
 
-Goal: produce `<name>-slack.png`, 256×256, RGBA, with transparent area outside the logo. If the logo has a containing circle/square/cluster with transparent regions inside (letter cutouts, gaps between cubes), fill those interior regions with white so the emoji reads on dark Slack themes.
+Goal: produce a 256×256 PNG (RGBA, transparent outside the logo). If the logo has a containing circle/square/cluster with transparent regions inside (letter cutouts, gaps between cubes), fill those interior regions with white so the emoji reads on dark Slack themes.
 
-Outputs go next to the input file (same directory). Default name: `<input-stem>-slack.png`. If a white-fill variant is also produced, name it `<input-stem>-slack-white.png`.
+### Output naming
+
+Outputs go next to the input file. The **primary output basename must equal the input stem** — `foo.svg` → `foo.png`, `foo.jpeg` → `foo.png`, etc. — because Slack (and slackmojis.com) auto-populates the emoji name from the uploaded filename's stem; a `-slack` suffix costs the user several clicks to strip.
+
+- **Different extension** (input is `.svg`, `.jpeg`, `.webp`, …): just write `<stem>.png`.
+- **Same extension** (input is a PNG): rename input to `<stem>-orig.png` first, then write output as `<stem>.png`. If `<stem>-orig.png` already exists, ask the user how to proceed (don't clobber).
+- **White-fill variant** (when produced): name it `<stem>-white.png`. Same collision check.
+- **Multiple named variants** (e.g. the user asks for size/crop comparisons like `-crop20`, `-crop30`): keep those distinguishing suffixes. Only the *primary* single deliverable needs the bare stem.
+
+Report the exact paths back in the final message so the user can find them.
 
 ## Decision tree
 
@@ -55,7 +64,7 @@ magick /tmp/work-trim.png -format "%wx%h\n" info:   # note tight bbox
 magick /tmp/work-trim.png -background none -gravity center \
   -extent <maxdim>x<maxdim> -resize 256x256 \
   -colorspace sRGB -type TrueColorAlpha \
-  PNG32:<name>-slack.png
+  PNG32:<stem>.png
 ```
 
 `<maxdim>` = `max(width, height)` of the trimmed image. The `-extent` pads the shorter side so the logo ends up centered in a square.
@@ -74,7 +83,7 @@ magick -size 1024x1024 xc:none -fill white -draw "circle 512,512 512,0" \
 magick /tmp/wf-1024.png /tmp/wf-disc.png -compose DstOver -composite /tmp/wf-combined.png
 magick /tmp/wf-combined.png -resize 256x256 \
   -colorspace sRGB -type TrueColorAlpha \
-  PNG32:<name>-slack-white.png
+  PNG32:<stem>-white.png
 ```
 
 For a rectangle: `-fill white -draw "rectangle 0,0 1023,1023"` (or whatever bounds).
@@ -115,7 +124,7 @@ magick /tmp/white-fill.png /tmp/work-trim.png \
 DIM=$(magick /tmp/combined.png -format "%[fx:max(w,h)]" info:)
 magick /tmp/combined.png -background none -gravity center -extent ${DIM}x${DIM} \
   -resize 256x256 -colorspace sRGB -type TrueColorAlpha \
-  PNG32:<name>-slack-white.png
+  PNG32:<stem>-white.png
 ```
 
 If `Disk:8` produces a mask with a too-low mean (interior holes still flagged as outside) or too-high mean (outside leaking inward), adjust:
