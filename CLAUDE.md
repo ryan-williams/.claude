@@ -437,6 +437,7 @@ And a few libraries I often use in JS/TS apps:
 
 ## Markdown
 - Define links' hrefs in the "footer", so that the inline links only require writing e.g. `[anchor text]` or `[long anchor text][short name]`, not full URLs.
+- **No hard line-wrapping** in MDs I author (my editor soft-wraps): one line per paragraph / list item / blockquote line, no fixed-column reflow. Exception: files someone else wrote that I'm just contributing to — match their existing wrapping style; don't reformat.
 
 ## Diffs
 `dffs` (https://github.com/runsascoded/dffs) should be `pipx install`'d and globally accessible (and also cloned at `~/c/dffs`), and exposes CLIs:
