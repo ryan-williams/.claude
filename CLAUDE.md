@@ -93,6 +93,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - "nop" = no-op
 - OM / OoM = order of magnitude
 - SE = side effect
+- arch = architecture
 - ogi = `og:image`
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
