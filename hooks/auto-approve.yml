@@ -243,6 +243,13 @@ rules:
         s3api: *aws-s3api-safe
         sts: *aws-sts-safe
   - allow-regex: '^aws (logs |ec2 describe-)'
+  # Generic RO verbs across all services: `describe-*`/`list-*` are
+  # read-only by AWS CLI convention; `get-*` too, EXCEPT secret-dumping
+  # ones (secretsmanager get-secret-value, ssm get-parameter
+  # --with-decryption, ecr get-login-password).
+  - allow-regex: '^aws (--profile \S+ )?[a-z0-9-]+ (describe|list)-[a-z-]+\b'
+  - allow-regex: '^aws (--profile \S+ )?(?!secretsmanager |ssm )[a-z0-9-]+ get-(?!login-password)[a-z-]+\b'
+  - allow: aws configure get
 
   # ── SLURM (read-only) ───────────────────────────────────────────
   - allow:
