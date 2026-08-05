@@ -1,11 +1,11 @@
 ---
 name: slack-emoji
-description: Convert a logo (SVG or PNG) into a ≤256px square PNG suitable for upload as a Slack custom emoji (slack.com/customize/emoji or slackmojis.com). Outside-the-logo stays transparent; if the logo has a central circle/square with transparent cutouts inside, those cutouts get a white fill so they don't disappear on dark themes. Use when the user says "make a slack emoji from X", "extract logo X as slack emoji", "<=256 png for slack", etc.
+description: Convert a logo (SVG or PNG) into a ≤256px PNG suitable for upload as a Slack custom emoji (slack.com/customize/emoji or slackmojis.com). Outside-the-logo stays transparent; if the logo has a central circle/square with transparent cutouts inside, those cutouts get a white fill so they don't disappear on dark themes. Use when the user says "make a slack emoji from X", "extract logo X as slack emoji", "<=256 png for slack", etc.
 ---
 
 # Logo → Slack emoji PNG
 
-Goal: produce a 256×256 PNG (RGBA, transparent outside the logo). If the logo has a containing circle/square/cluster with transparent regions inside (letter cutouts, gaps between cubes), fill those interior regions with white so the emoji reads on dark Slack themes.
+Goal: produce a PNG whose larger dimension is 256px, preserving the logo's natural aspect ratio (RGBA, transparent outside the logo). If the logo has a containing circle/square/cluster with transparent regions inside (letter cutouts, gaps between cubes), fill those interior regions with white so the emoji reads on dark Slack themes.
 
 ### Output naming
 
@@ -17,6 +17,19 @@ Outputs go next to the input file. The **primary output basename must equal the 
 - **Multiple named variants** (e.g. the user asks for size/crop comparisons like `-crop20`, `-crop30`): keep those distinguishing suffixes. Only the *primary* single deliverable needs the bare stem.
 
 Report the exact paths back in the final message so the user can find them.
+
+### Output sizing / aspect ratio
+
+**Default: fit the tight bbox to 256 on its larger dim, preserving the logo's natural aspect ratio.** Do not pad the smaller dim with transparent margins. When a Slack user types several emojis in a row, a naturally tall/wide logo padded into a square has big empty side gaps that visually offset it from neighboring emoji — it reads as misaligned or floating.
+
+Practically: after producing the tight-bbox intermediate (`-trim +repage` in Cases 1/3, natural composite in Case 2), just `-filter Lanczos -resize 256x256` (which fits inside 256x256 preserving aspect) — **no `-extent <maxdim>x<maxdim>` step**.
+
+Exceptions — **pad to square** with `-extent <maxdim>x<maxdim>` before the resize:
+- The logo is already naturally square (extent is a no-op).
+- The user explicitly asked for a square/padded output ("pad to square", "square canvas", "keep it square").
+- The natural aspect is extreme enough that fitting produces an illegible sliver (e.g. a wordmark → 256×24). Consider padding, or ask.
+
+Slack accepts non-square emoji fine — cap is 256px on the larger dim and 128KB total.
 
 ## Decision tree
 
@@ -60,14 +73,21 @@ magick /tmp/work-trim.png -format "%wx%h\n" info:   # note tight bbox
 
 ### 2a. Case 1 — open-shape logo (transparent only)
 
+Default (fit, preserve aspect):
 ```bash
-magick /tmp/work-trim.png -background none -gravity center \
-  -extent <maxdim>x<maxdim> -resize 256x256 \
+magick /tmp/work-trim.png -filter Lanczos -resize 256x256 \
   -colorspace sRGB -type TrueColorAlpha \
   PNG32:<stem>.png
 ```
 
-`<maxdim>` = `max(width, height)` of the trimmed image. The `-extent` pads the shorter side so the logo ends up centered in a square.
+Only if user asked for a square canvas (see "Output sizing" above), pad first:
+```bash
+magick /tmp/work-trim.png -background none -gravity center \
+  -extent <maxdim>x<maxdim> -filter Lanczos -resize 256x256 \
+  -colorspace sRGB -type TrueColorAlpha \
+  PNG32:<stem>.png
+```
+where `<maxdim>` = `max(width, height)` of the trimmed image.
 
 ### 2b. Case 2 — containing circle/square with cutouts
 
@@ -120,10 +140,9 @@ magick -size $WH xc:white \
 magick /tmp/white-fill.png /tmp/work-trim.png \
   -compose Over -composite PNG32:/tmp/combined.png
 
-# Pad to square + resize
-DIM=$(magick /tmp/combined.png -format "%[fx:max(w,h)]" info:)
-magick /tmp/combined.png -background none -gravity center -extent ${DIM}x${DIM} \
-  -resize 256x256 -colorspace sRGB -type TrueColorAlpha \
+# Fit to 256 (preserve aspect). Only pad to square if user asked for it — see "Output sizing".
+magick /tmp/combined.png -filter Lanczos -resize 256x256 \
+  -colorspace sRGB -type TrueColorAlpha \
   PNG32:<stem>-white.png
 ```
 
