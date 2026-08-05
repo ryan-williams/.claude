@@ -261,6 +261,8 @@ rules:
         s3api: *aws-s3api-safe
         sts: *aws-sts-safe
   - allow-regex: '^aws (logs |ec2 describe-)'
+  # `date` is read-only except -s/--set (sets the system clock)
+  - allow-regex: '^date(?!.*\s(-s|--set)\b)(\s|$)'
   # Generic RO verbs across all services: `describe-*`/`list-*` are
   # read-only by AWS CLI convention; `get-*` too, EXCEPT secret-dumping
   # ones (secretsmanager get-secret-value, ssm get-parameter
