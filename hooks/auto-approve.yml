@@ -242,6 +242,15 @@ rules:
       cargo: [build, check, clippy, doc, install, metadata, run, search, test, tree]
   - allow: wasm-pack build
 
+  # ── Go ──────────────────────────────────────────────────────────
+  # Read/build/test/inspect subcommands only. Allows optional inline env
+  # assignments (e.g. `CGO_ENABLED=1 go test`) via the `\w+=\S+ ` prefix so the
+  # project's standard `CGO_ENABLED=1 go build -tags fts5 ...` invocations pass.
+  # Deliberately EXCLUDES `run`, `generate`, `install`, `get`, `tool` (execute
+  # arbitrary code) and `mod`/`work`/`clean` (mutate deps/state).
+  - allow-regex: '^(\w+=\S+ )*go (build|doc|env|fmt|list|test|version|vet)( |$)'
+  - allow: gofmt
+
   # ── AWS (read-only) ───────────────────────────────────────────
   - allow:
       aws s3: &aws-s3-safe [ls]
