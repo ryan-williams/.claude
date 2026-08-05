@@ -19,7 +19,7 @@ A phases string is a sequence of characters from `{t, c, a, s, p, d, w}`:
   - If a workflow hint is provided (second arg), use `ghwr <hint>` for fuzzy-matching
   - If no hint, look for a single `workflow_dispatch`-enabled workflow; if ambiguous, ask
   - Pass `--no-open` since we'll watch via `w` phase (or the user can open manually)
-- `w` = **watch**: watch the just-dispatched GHA run via `gh run watch`, then report the result
+- `w` = **watch**: watch the just-dispatched GHA run via `ghws` (`github-run-watch`), then report the result
 
 ## Constraints
 - `c` and `a` are mutually exclusive (error if both present)
@@ -58,7 +58,8 @@ If the first non-flag argument matches `^[tcaspdw]+$` (and isn't a filesystem pa
 - After dispatch, find the just-triggered run:
   - Parse the run ID from the dispatch phase's output, or
   - Use `gh run list -w <workflow> -L 1 --json databaseId` to find the latest run
-- Run `gh run watch <run-id>` to stream status
+- Run `ghws <run-id>` (`github-run-watch`; exp-backoff polling — not raw `gh run watch`, whose 3s poll trips GH rate limits) to stream status
+  - Or dispatch+watch in one step: `ghwr -W <hint>` replaces the `d`+`w` pair
 - When done, report success/failure and show the run URL
 
 ## Default behavior (no phases string)

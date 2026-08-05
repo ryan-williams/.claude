@@ -13,7 +13,7 @@ Steps:
    - `gh run list --branch <branch-or-user-branch> -L 5 --json databaseId,status,workflowName,event,createdAt,headBranch`
    - If the branch was pushed via `gpu`, the remote branch name is `u/<prefix>/<branch>` — check both the local and remote branch names
    - Pick the most recent run (preferring in-progress over completed)
-   - If in progress: `gh run watch <run-id>` to stream status
+   - If in progress: `ghws <run-id>` (`github-run-watch`; exp-backoff polling — do NOT use raw `gh run watch`, its 3s poll trips GH secondary rate limits)
    - When done, report success/failure and show the run URL
 5. **GitLab**: find and watch the most recent pipeline:
    - `glab ci list -b <branch> --per-page 5` to find recent pipelines
