@@ -4,9 +4,21 @@
     "allow": [
       "WebFetch",
       "WebSearch"
-    ]
+    ],
+    "defaultMode": "auto"
   },
   "model": "claude-fable-5[1m]",
+  "skillOverrides": {
+    "ahs": "off",
+    "agents-sdk": "off",
+    "cloudflare": "off",
+    "cloudflare-email-service": "off",
+    "durable-objects": "off",
+    "sandbox-sdk": "off",
+    "web-perf": "off",
+    "workers-best-practices": "off",
+    "wrangler": "off"
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -21,9 +33,9 @@
     ]
   },
   "enabledPlugins": {
-    "frontend-design@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": false,
+    "clangd-lsp@claude-plugins-official": false,
+    "rust-analyzer-lsp@claude-plugins-official": false,
     "slack@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
