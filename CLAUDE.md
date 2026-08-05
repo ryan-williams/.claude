@@ -119,7 +119,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - CL = context length, CW = context window (for language models)
 - WB = wandb = Weights & Biases
 - RO = read-only, RW = read-write
-- EM = envelope math (approximations); NM = napkin-math
+- EM = envelope math (approximations); NM = napkin-math, BoE = "back of envelope"
 - st = something, ost = or something
 - fp = force-push, afp = amend (or autosquash) + force-push
 - asq = autosquash
@@ -136,6 +136,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - h11n = harmonization
 - AP = anti-pattern
 - bk = bookkeeping
+- RH = rabbit hole
 - ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law, RE = reconstruction loss/error (lossy-codec / autoencoder reconstruction quality), VV = VQ-VAE (vector-quantized variational autoencoder)
 - WR = with replacment, WOR = without replacement (i.e. when sampling from a distribution)
 - BT = Boundary Triangle (in H3): the 6 small triangular slivers along each hex parent's edges where parent area and 7-children union geometrically differ. ~5% of parent area; ~7-8% of stations land in one BT or another per level transition. H3 docs ack the issue, library doesn't model BTs first-class (cellToParent is non-exact for points in a BT). For exact aggregation across resolutions, BTs need their own row-buckets or queries stay single-resolution.
