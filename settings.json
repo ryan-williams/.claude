@@ -3,7 +3,8 @@
   "permissions": {
     "allow": [
       "WebFetch",
-      "WebSearch"
+      "WebSearch",
+      "mcp__claude-in-chrome__tabs_context_mcp"
     ],
     "defaultMode": "auto"
   },
