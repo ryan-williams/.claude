@@ -13,6 +13,7 @@ from auto_approve import (
     AnyToken,
     GlobPattern,
     Literal,
+    _DEFAULT_WRAPPERS,
     _extract_compound_body,
     _match_trie,
     _reassemble_compounds,
@@ -22,9 +23,18 @@ from auto_approve import (
     match_rules,
     match_tokens,
     parse_pattern,
+    set_wrappers,
     shlex_split_safe,
     split_shell_commands,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_wrappers():
+    """Restore default wrappers after each test — tests that call `set_wrappers`
+    to install custom entries must not leak into the next test."""
+    yield
+    set_wrappers(_DEFAULT_WRAPPERS)
 
 
 # ── Token matchers ───────────────────────────────────────────────
@@ -215,6 +225,94 @@ class TestStripWrappers:
         result = _strip_wrappers("nohup cmd > /tmp/out 2>&1")
         assert ">" in result
         assert "2>&1" in result
+
+    def test_direnv_exec_dot(self):
+        assert _strip_wrappers("direnv exec . python foo.py") == "python foo.py"
+
+    def test_direnv_exec_abs_path(self):
+        assert _strip_wrappers(
+            "direnv exec /Users/ryan/c/rac/watchy pnpm build"
+        ) == "pnpm build"
+
+    def test_direnv_exec_preserves_redirects(self):
+        assert _strip_wrappers(
+            "direnv exec . python foo.py 2>&1 | grep -v direnv:"
+        ) == "python foo.py 2>&1 | grep -v direnv:"
+
+    def test_direnv_exec_nested_under_timeout(self):
+        assert _strip_wrappers(
+            "timeout 30 direnv exec . pnpm test"
+        ) == "pnpm test"
+
+    def test_bare_direnv_not_stripped(self):
+        # `direnv` alone (e.g. `direnv reload`, `direnv allow`) must not unwrap.
+        assert _strip_wrappers("direnv reload") == "direnv reload"
+        assert _strip_wrappers("direnv allow .") == "direnv allow ."
+
+    def test_env_assignment_then_direnv_exec(self):
+        # `VAR=val direnv exec DIR cmd` — env-assignment hides the wrapper from
+        # the initial pass; `_unwrap_command` must re-strip after unwrapping the
+        # VAR=val prefix.
+        assert _unwrap_command(
+            "VITE_INTERNAL=1 direnv exec /Users/ryan/c/rac/watchy pnpm build"
+        ) == ("pnpm build", None)
+
+
+# ── YAML-configurable wrappers ───────────────────────────────────
+
+class TestWrappersConfigurable:
+    def test_yaml_shape_single_token_no_skip(self):
+        set_wrappers([{"prefix": "myrun"}])
+        assert _strip_wrappers("myrun pnpm test") == "pnpm test"
+
+    def test_yaml_shape_single_token_skip_int(self):
+        set_wrappers([{"prefix": "runit", "skip": 2}])
+        # runit LEVEL LOGFILE cmd args...
+        assert _strip_wrappers("runit 3 /tmp/log pnpm build") == "pnpm build"
+
+    def test_yaml_shape_skip_flags(self):
+        set_wrappers([{"prefix": "wrap", "skip": "flags"}])
+        assert _strip_wrappers("wrap -a -b 2 pnpm test") == "pnpm test"
+
+    def test_yaml_shape_multi_token_prefix(self):
+        set_wrappers([{"prefix": ["pixi", "run"]}])
+        assert _strip_wrappers("pixi run pnpm build") == "pnpm build"
+
+    def test_yaml_shape_multi_token_with_skip(self):
+        set_wrappers([{"prefix": ["distrobox", "enter"], "skip": 2}])
+        # distrobox enter -n NAME cmd args...
+        assert _strip_wrappers("distrobox enter -n mybox pnpm test") == "pnpm test"
+
+    def test_replacing_defaults_removes_them(self):
+        # An explicit set_wrappers() replaces the entire table — no direnv now.
+        set_wrappers([{"prefix": "myrun"}])
+        assert _strip_wrappers("direnv exec . pnpm build") == "direnv exec . pnpm build"
+        assert _strip_wrappers("timeout 30 git log") == "timeout 30 git log"
+
+    def test_longer_prefix_wins_over_shorter(self):
+        set_wrappers([
+            {"prefix": "foo"},
+            {"prefix": ["foo", "bar"], "skip": 1},
+        ])
+        # "foo pnpm test" — only "foo" matches → "pnpm test"
+        assert _strip_wrappers("foo pnpm test") == "pnpm test"
+        # "foo bar SKIP cmd" — 2-token prefix wins → skip "SKIP" → cmd
+        assert _strip_wrappers("foo bar SKIP pnpm build") == "pnpm build"
+
+    def test_invalid_entries_skipped(self):
+        # Bad entries don't crash — they're silently dropped, so pre-existing
+        # wrappers (if any) remain. Here we install one good + several bad.
+        set_wrappers([
+            {"prefix": "good"},
+            {"prefix": 42},                    # not str/list
+            {"prefix": []},                    # empty list
+            {"prefix": ["mixed", 3]},          # non-str in list
+            {"prefix": "bad-skip", "skip": -1}, # negative int
+            {"prefix": "bad-skip2", "skip": "bogus"}, # unknown string
+            "not a dict",                      # not even a dict
+        ])
+        assert _strip_wrappers("good pnpm test") == "pnpm test"
+        assert _strip_wrappers("bad-skip pnpm test") == "bad-skip pnpm test"
 
 
 # ── Command unwrapping ──────────────────────────────────────────

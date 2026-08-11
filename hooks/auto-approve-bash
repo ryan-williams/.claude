@@ -21,7 +21,15 @@ import sys
 
 # Add hooks dir to path so we can import the engine
 sys.path.insert(0, str(Path(__file__).parent))
-from auto_approve import evaluate_command, load_rules, load_ssh_rules, validate_spec
+from auto_approve import (
+    _DEFAULT_WRAPPERS,
+    evaluate_command,
+    load_rules,
+    load_ssh_rules,
+    load_wrappers,
+    set_wrappers,
+    validate_spec,
+)
 
 LOG_FILE = Path.home() / ".claude" / "hooks" / "auto-approve.log"
 
@@ -34,6 +42,7 @@ def main():
 
     all_rules = []
     all_ssh_rules = []
+    all_wrappers = list(_DEFAULT_WRAPPERS)  # built-ins first; later entries override by prefix
     warnings = []
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", "")
     if project_dir:
@@ -41,10 +50,14 @@ def main():
         warnings.extend(validate_spec(project_yml))
         all_rules.extend(load_rules(project_yml))
         all_ssh_rules.extend(load_ssh_rules(project_yml))
+        all_wrappers.extend(load_wrappers(project_yml))
     global_yml = Path.home() / ".claude" / "hooks" / "auto-approve.yml"
     warnings.extend(validate_spec(global_yml))
     all_rules.extend(load_rules(global_yml))
     all_ssh_rules.extend(load_ssh_rules(global_yml))
+    all_wrappers.extend(load_wrappers(global_yml))
+
+    set_wrappers(all_wrappers)
 
     for w in warnings:
         print(f"auto-approve warning: {w}", file=sys.stderr)

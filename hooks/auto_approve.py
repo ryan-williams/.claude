@@ -284,7 +284,7 @@ def split_shell_commands(command: str) -> list[str]:
 
 # ── Rule loading and matching ────────────────────────────────────
 
-RECOGNIZED_KEYS = {"rules", "ssh-rules"}
+RECOGNIZED_KEYS = {"rules", "ssh-rules", "wrappers"}
 
 
 def _load_yaml(path: Path) -> dict:
@@ -306,6 +306,11 @@ def load_rules(path: Path) -> list[dict]:
 def load_ssh_rules(path: Path) -> list[dict]:
     """Load SSH-specific rules from a YAML spec file."""
     return _load_yaml(path).get("ssh-rules", [])
+
+
+def load_wrappers(path: Path) -> list[dict]:
+    """Load wrapper defs from a YAML spec file (extends built-in defaults)."""
+    return _load_yaml(path).get("wrappers", [])
 
 
 def validate_spec(path: Path) -> list[str]:
@@ -341,18 +346,70 @@ def validate_spec(path: Path) -> list[str]:
     return warnings
 
 
-# Commands that wrap another command. Each maps to how many args to skip
-# after the wrapper keyword before the wrapped command begins.
-# None = skip flags until a non-flag token, then skip that too if it's an arg.
-_WRAPPER_CMDS = {
-    "nohup": 0,       # nohup cmd args...
-    "time": 0,         # time cmd args...
-    "nice": None,      # nice [-n N] cmd args...
-    "ionice": None,    # ionice [-c N] [-n N] cmd args...
-    "timeout": 1,      # timeout DURATION cmd args...
-    "strace": None,    # strace [-flags] cmd args...
-    "ltrace": None,    # ltrace [-flags] cmd args...
-}
+# Built-in wrapper commands. Each entry is a dict with:
+#   prefix: str | list[str]    — the wrapper token(s) at the head of the cmd
+#   skip:   int | "flags"      — how many tokens after `prefix` belong to the
+#                                 wrapper (not the wrapped cmd). Default 0.
+#                                 "flags" = skip a run of `-flag [arg]` pairs.
+#
+# Loaded into `_WRAPPER_CMDS` at import time. YAML `wrappers:` blocks in
+# per-user or per-project spec files EXTEND this via `set_wrappers()` — see
+# `~/.claude/hooks/auto-approve.yml` for the syntax.
+_DEFAULT_WRAPPERS = [
+    {"prefix": "nohup"},                       # nohup cmd args...
+    {"prefix": "time"},                        # time cmd args...
+    {"prefix": "nice",    "skip": "flags"},    # nice [-n N] cmd args...
+    {"prefix": "ionice",  "skip": "flags"},    # ionice [-c N] [-n N] cmd args...
+    {"prefix": "timeout", "skip": 1},          # timeout DURATION cmd args...
+    {"prefix": "strace",  "skip": "flags"},    # strace [-flags] cmd args...
+    {"prefix": "ltrace",  "skip": "flags"},    # ltrace [-flags] cmd args...
+    {"prefix": ["direnv", "exec"], "skip": 1}, # direnv exec DIR cmd args...
+]
+
+# Live wrapper table. Keys are prefix tuples; values are the skip mode
+# (int N = skip N positional; None = skip flag pairs). Longest-prefix wins.
+_WRAPPER_CMDS: dict[tuple[str, ...], int | None] = {}
+
+
+def _compile_wrapper(entry: dict) -> tuple[tuple[str, ...], int | None]:
+    """Normalize one wrapper YAML entry to (prefix_tuple, skip_mode)."""
+    prefix = entry.get("prefix")
+    if isinstance(prefix, str):
+        prefix_tuple = (prefix,)
+    elif isinstance(prefix, list) and prefix and all(isinstance(p, str) for p in prefix):
+        prefix_tuple = tuple(prefix)
+    else:
+        raise ValueError(f"wrapper `prefix` must be str or non-empty list[str]; got {prefix!r}")
+    skip = entry.get("skip", 0)
+    if skip == "flags":
+        skip_mode: int | None = None
+    elif isinstance(skip, bool):
+        raise ValueError(f"wrapper `skip` must be int or 'flags'; got bool {skip!r}")
+    elif isinstance(skip, int) and skip >= 0:
+        skip_mode = skip
+    else:
+        raise ValueError(f"wrapper `skip` must be non-negative int or 'flags'; got {skip!r}")
+    return prefix_tuple, skip_mode
+
+
+def set_wrappers(entries: list[dict]) -> None:
+    """Replace the live wrapper table. Later entries override earlier by prefix."""
+    global _WRAPPER_CMDS
+    table: dict[tuple[str, ...], int | None] = {}
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        try:
+            key, val = _compile_wrapper(e)
+        except ValueError:
+            continue
+        table[key] = val
+    _WRAPPER_CMDS = table
+
+
+# Populate defaults at import so bare `from auto_approve import _strip_wrappers`
+# (tests, ad-hoc scripts) works without an explicit set_wrappers() call.
+set_wrappers(_DEFAULT_WRAPPERS)
 
 # Passthrough flags: tokens that appear after a known leading command but don't
 # change its semantics for AA purposes. Stripped only when adjacent to the
@@ -373,23 +430,37 @@ def _strip_wrappers(cmd: str) -> str:
     while changed:
         changed = False
         tokens = shlex_split_safe(stripped)
-        if not tokens or tokens[0] not in _WRAPPER_CMDS:
+        if not tokens:
             break
 
-        skip_mode = _WRAPPER_CMDS[tokens[0]]
+        # Longest matching wrapper prefix (tuples of tokens).
+        matched_key: tuple[str, ...] | None = None
+        for key in _WRAPPER_CMDS:
+            n = len(key)
+            if (
+                len(tokens) >= n
+                and tuple(tokens[:n]) == key
+                and (matched_key is None or n > len(matched_key))
+            ):
+                matched_key = key
+        if matched_key is None:
+            break
+
+        matched_len = len(matched_key)
+        skip_mode = _WRAPPER_CMDS[matched_key]
         # Count how many tokens to skip
-        skip_count = 1  # the wrapper itself
+        skip_count = matched_len  # the wrapper prefix itself
 
         if skip_mode is None:
             # Skip flags and their args
-            i = 1
+            i = matched_len
             while i < len(tokens) and tokens[i].startswith("-"):
                 i += 1
                 if i < len(tokens) and not tokens[i].startswith("-"):
                     i += 1
             skip_count = i
         elif isinstance(skip_mode, int):
-            skip_count = 1 + skip_mode
+            skip_count = matched_len + skip_mode
 
         # Find the position in the raw string where the inner command starts
         # by finding each skipped token and advancing past it
@@ -440,6 +511,10 @@ def _unwrap_command(command: str) -> tuple[str, str | None]:
         return "", None
     while m := re.match(r'^[A-Za-z_]\w*=\S*\s+(.+)$', cmd):
         cmd = m.group(1)
+
+    # Env-assignments hid the wrapper (`VITE_FOO=1 direnv exec . pnpm build`) —
+    # re-run wrapper stripping now that leading `VAR=val` prefixes are gone.
+    cmd = _strip_wrappers(cmd)
 
     m = re.match(r'^(\S+)\s+', cmd)
     if m and m.group(1) in _PASSTHROUGH_FLAGS:

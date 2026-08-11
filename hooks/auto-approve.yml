@@ -1,6 +1,8 @@
 # Auto-approve rules for Bash commands.
 # First match wins. No match = normal permission prompt.
 #
+# Top-level keys: rules, ssh-rules, wrappers, _<anchor>.
+#
 # Rule value formats:
 #   string          single pattern (shlex-aware, prefix match by default)
 #   list            each item is a standalone pattern string
@@ -14,6 +16,18 @@
 #   $           end anchor: no extra args allowed
 #
 # Use allow-regex: / deny-regex: / ask-regex: for raw regex fallback.
+#
+# `wrappers:` — extend `_DEFAULT_WRAPPERS` (nohup / time / nice / ionice /
+# timeout / strace / ltrace / direnv exec) with additional wrapper commands
+# whose prefix should be stripped before rule matching. Each entry:
+#     prefix: str | list[str]      # the wrapper tokens
+#     skip:   int | "flags" | 0    # tokens after `prefix` that still belong
+#                                    to the wrapper (default 0)
+# Examples (both project and global specs accept this key):
+#     wrappers:
+#       - {prefix: [pixi, run]}                 # `pixi run pnpm test` → `pnpm test`
+#       - {prefix: [distrobox, enter], skip: 2} # `distrobox enter -n NAME cmd` → `cmd`
+#       - {prefix: envchain, skip: 1}           # `envchain PROFILE cmd` → `cmd`
 
 # ── Shared anchors ───────────────────────────────────────────────
 # These are reused in both `rules` (local) and `ssh-rules` (remote).
