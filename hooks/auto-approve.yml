@@ -323,8 +323,15 @@ rules:
 
   # ── Project helpers ────────────────────────────────────────────
   - allow:
+    - aa-test
     - bmdf
     - ghpr
+    # ghws = github-run-watch (exp-backoff poll of a GHA run). Read-only.
+    # Deliberately excludes ghwr (dispatches new run = mutation).
+    - ghws
+    # make-dockerignore.py: regenerates project .dockerignore from Git-tracked
+    # paths — deterministic pre-commit-style tool. Fine to AA.
+    - make-dockerignore.py
     - pds
     - pqa
     - pqh
