@@ -324,6 +324,10 @@ rules:
   # ── Project helpers ────────────────────────────────────────────
   - allow:
     - aa-test
+    # auto-approve-rotate: archives older monthly chunks of the AA log to
+    # hooks/archive/*.gz without deleting any lines. Idempotent, no external
+    # side effects — just rearranges its own log dir.
+    - auto-approve-rotate
     - bmdf
     - ghpr
     # ghws = github-run-watch (exp-backoff poll of a GHA run). Read-only.

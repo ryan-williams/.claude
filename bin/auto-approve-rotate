@@ -1,0 +1,141 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# ///
+"""Archive older lines of ~/.claude/hooks/auto-approve.log without deleting.
+
+Groups the live log's lines by calendar month (YYYY-MM), appends each month
+older than the retention window to `hooks/archive/auto-approve.<month>.log.gz`,
+and rewrites the live log with only the recent lines kept.
+
+Multi-line command entries (heredocs, embedded newlines) are kept with their
+originating month by attaching continuation lines to the last dated line seen.
+
+Gzip files are appended to in "at" mode — Python writes a fresh gzip stream on
+each open. Multi-stream gzip is a documented feature; `zgrep`, `gunzip -c`,
+and GNU `zcat` handle them as one logical file, so re-running this script
+across multiple months just keeps growing the same archives. (Note: BSD
+`zcat` on macOS wants a `.Z` suffix — prefer `gunzip -c` or `gzcat` there.)
+
+Race window: between reading the live log and atomically replacing it, a hook
+invocation writing to the live log will land in the pre-swap inode and be lost
+after the swap. In practice: rotation is a rare (weekly-ish) manual/cron job
+and the window is a few ms.
+
+Usage:
+  auto-approve-rotate            # archive months older than retention, rewrite live log
+  auto-approve-rotate --dry-run  # report what would be archived, change nothing
+  auto-approve-rotate --keep N   # keep N most recent calendar months live (default: 2)
+"""
+
+from __future__ import annotations
+
+import argparse
+import gzip
+import re
+import sys
+from collections import defaultdict
+from datetime import date
+from pathlib import Path
+
+HOOKS = Path.home() / ".claude" / "hooks"
+LOG = HOOKS / "auto-approve.log"
+ARCHIVE = HOOKS / "archive"
+
+# Only lines that begin `YYYY-MM-DD ` are dated events. Anything else is a
+# continuation of the previous dated entry (multi-line command bodies, etc.).
+DATE_RE = re.compile(r'^(\d{4})-(\d{2})-\d{2} ')
+
+
+def months_before(ym: tuple[int, int], n: int) -> tuple[int, int]:
+    """Return the (year, month) that is `n` months earlier than `ym`."""
+    y, m = ym
+    total = y * 12 + (m - 1) - n
+    return divmod(total, 12)[0], divmod(total, 12)[1] + 1
+
+
+def format_bytes(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("-n", "--dry-run", action="store_true",
+                    help="Report what would be archived; touch nothing.")
+    ap.add_argument("-k", "--keep", type=int, default=2, metavar="N",
+                    help="Keep N most recent calendar months live (default: 2).")
+    args = ap.parse_args()
+
+    if args.keep < 1:
+        print(f"--keep must be ≥ 1 (got {args.keep})", file=sys.stderr)
+        return 2
+
+    if not LOG.exists():
+        print(f"{LOG}: does not exist; nothing to rotate", file=sys.stderr)
+        return 0
+
+    today = date.today()
+    cutoff = months_before((today.year, today.month), args.keep - 1)
+    cutoff_key = f"{cutoff[0]:04d}-{cutoff[1]:02d}"
+
+    # Bucket lines by their YYYY-MM prefix. Continuation lines glue to whatever
+    # bucket the last dated line went into.
+    buckets: dict[str, list[str]] = defaultdict(list)
+    keep_live: list[str] = []
+    current_bucket: list[str] | None = None
+
+    with LOG.open() as fh:
+        for line in fh:
+            m = DATE_RE.match(line)
+            if m:
+                key = f"{m.group(1)}-{m.group(2)}"
+                if key >= cutoff_key:
+                    current_bucket = keep_live
+                else:
+                    current_bucket = buckets[key]
+            # Continuation lines fall through to whichever bucket we're in.
+            (current_bucket if current_bucket is not None else keep_live).append(line)
+
+    if not buckets:
+        print(f"nothing to archive: all lines within retention "
+              f"(≥ {cutoff_key})", file=sys.stderr)
+        return 0
+
+    # Report + act.
+    for key in sorted(buckets):
+        n_lines = len(buckets[key])
+        n_bytes = sum(len(s) for s in buckets[key])
+        dest = ARCHIVE / f"auto-approve.{key}.log.gz"
+        prefix = "would append" if args.dry_run else "appended"
+        print(f"{prefix} {n_lines:6d} lines ({format_bytes(n_bytes):>9s}) "
+              f"to {dest.name}", file=sys.stderr)
+
+    if args.dry_run:
+        n_keep = len(keep_live)
+        n_bytes = sum(len(s) for s in keep_live)
+        print(f"would keep   {n_keep:6d} lines ({format_bytes(n_bytes):>9s}) "
+              f"in {LOG.name}", file=sys.stderr)
+        return 0
+
+    ARCHIVE.mkdir(parents=True, exist_ok=True)
+    for key in sorted(buckets):
+        dest = ARCHIVE / f"auto-approve.{key}.log.gz"
+        with gzip.open(dest, "at") as gz:
+            gz.writelines(buckets[key])
+
+    # Atomic rewrite of the live log.
+    tmp = LOG.with_suffix(LOG.suffix + ".tmp")
+    tmp.write_text("".join(keep_live))
+    tmp.replace(LOG)
+    print(f"kept        {len(keep_live):6d} lines "
+          f"({format_bytes(LOG.stat().st_size):>9s}) in {LOG.name}",
+          file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
