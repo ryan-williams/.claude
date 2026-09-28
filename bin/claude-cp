@@ -13,9 +13,45 @@ import shutil
 import sys
 
 
+# Claude Code caps an encoded project-dir name at 200 chars, appending a hash of
+# the full path when it has to truncate.
+ENCODED_MAX = 200
+
+
+def path_hash(s: str) -> str:
+    """`Math.abs(h).toString(36)` over the CLI's 32-bit `h = (h << 5) - h + c | 0`."""
+    h = 0
+    for ch in s:
+        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+        if h >= 0x80000000:
+            h -= 0x100000000
+    h = abs(h)
+    if not h:
+        return '0'
+    digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+    out = ''
+    while h:
+        h, r = divmod(h, 36)
+        out = digits[r] + out
+    return out
+
+
 def encode_path(path: Path) -> str:
-    """Encode path to Claude's project dir format: /foo/bar/.baz → -foo-bar-baz"""
-    return re.sub(r'\.', '', str(path).replace('/', '-'))
+    """Encode a path the way Claude Code names dirs under `~/.claude/projects/`.
+
+    Every non-alphanumeric char becomes `-`, so `/Users/ryan/.rc` encodes to
+    `-Users-ryan--rc` — the dot becomes a second dash rather than vanishing.
+    Dropping dots instead sent this tool looking for `-Users-ryan-disk` when the
+    real dir was `-Users-ryan--disk`. Underscores and spaces collapse too.
+
+    Kept in sync with the same function in the sibling script; each script here
+    is standalone (PEP 723), so there's nowhere shared to put it.
+    """
+    s = str(path)
+    encoded = re.sub(r'[^A-Za-z0-9]', '-', s)
+    if len(encoded) <= ENCODED_MAX:
+        return encoded
+    return f'{encoded[:ENCODED_MAX]}-{path_hash(s)}'
 
 
 def copy_project_config(src_path: Path, dst_path: Path, dry_run: bool) -> bool:
