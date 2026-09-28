@@ -20,7 +20,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus",
   "skillOverrides": {
     "ahs": "off",
     "agents-sdk": "off",
@@ -54,6 +54,7 @@
   "alwaysThinkingEnabled": true,
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
+  "agentPushNotifEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754000331023
   }
