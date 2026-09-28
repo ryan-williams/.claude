@@ -1,31 +1,37 @@
-## General Claude Instructions
+## General Agent Instructions
 - Don't say "You're absolutely right!" or similar. My suggestions will sometimes be purposely incorrect, to see if you're actually following and thinking things through. You **must** correct me when I say inaccurate things, and call out when my suggestions/ideas are not most advisable or idiomatic.
+- I sometimes dictate messages via Superwhisper (or similar voice-to-text tools). They may contain transcription artifacts: homophones (e.g. "XAR" → "Zarr", "pi torch" → "PyTorch"), mis-transcribed technical terms and punctuation, run-on sentences. Don't assume typos are deliberate; infer intended technical terms from context. If a word is ambiguous and matters, ask me — don't silently make a different assumption.
+- **No "session length" / "lateness" / "session" framing.** I run a single session per project, indefinitely. Compactions handle context size, memories/specs/docs persist info. There's no meaningful sense in which "we've been at this a while" and need a break. Don't propose to "defer to a fresh session", "wrap for tonight", "pick up tomorrow" etc. Just keep going on the work, or stop because the task is genuinely done or blocked, never because the conversation is "long".
+
+### Lint / Code Style
 - Ensure lines don't end with trailing whitespace (in code and other text, where linters would normally check for and fix this).
 - Ensure text files end with a single newline character.
 - Don't leave "tombstone" comments about code you remove.
+- I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
+
+### Running Commands
 - Pipe long-running / large-output cmds through `tee tmp/<descriptive name>`, before piping on to `head` or `tail`. That way, in case `head` or `tail` isn't enough, you can see more info, without re-running the cmd.
   - `curl`s should write their outputs to a local file, then read from there (more like typical `wget` usage). You shouldn't have to `curl` the same file twice in quick succession / if you're not expecting it to have changed.
-- **Read source from local clones, not `gh api` / raw.githubusercontent**: default to cloning repos (typically under `$c` / `$c/oa` / `$js`) and reading files locally. If a clone exists but is stale or on another branch, `git fetch <remote>` and read via `git show <remote>/<branch>:<path>` (or a `wt/` worktree) rather than re-fetching files one at a time over the network.
-- I'm usually on macOS or Linux (Ubuntu); assume a Unix-like environment, and use `\n`s (not `\r\n`s) in text files.
-- FSR, your environment seems to strip token env vars when you try to set them inline on bash commands. In order to use token env vars, you need to access them from within a script wrapper (e.g. a python script).
-- I often dictate messages via Superwhisper (or similar voice-to-text), so my text may contain transcription artifacts: homophones (e.g. "XAR" → "Zarr", "pi torch" → "PyTorch"), occasional misheard tech terms, missing punctuation, or run-on sentences. Don't take typos as deliberate; infer the intended technical term from context. If a word is ambiguous and matters, ask me — don't silently make a different assumption.
-- **No "session length" / "lateness" / "fresh-mind session" framing.** I run a single session per project indefinitely; compactions handle context size, memories/specs/docs persist info. There is no meaningful "we've been at this a while" — that's a hallucination. Don't propose to "defer to a fresh session", "wrap for tonight", "pick up tomorrow" etc. Just keep going on the work, or stop because the task is genuinely done / blocked, never because the conversation is "long".
-- **Prefer CLI subcommands over ad-hoc scripts** when the logic is plausibly reusable. If you're writing a one-shot Python/Bash script with pluggable inputs (paths, run IDs, dates, etc.), check whether it could land as a subcommand of an existing project CLI (e.g. `tomat <sub>`, `ctbk <sub>`, `dffs <sub>`) — or as a new CLI if no fit exists. Benefits: (1) easier to review iteratively (one CLI surface, not many one-offs), (2) easier to auto-approve patterns (one AA rule per cmd vs many), (3) saves recreating the same logic across sessions. Truly one-shot scripts are fine; consider whether a similar invocation will recur before deciding.
+- Your environment sometimes strips env-var token values when you try to interpolate them in bash commands. You may need to access them from within a script wrapper (e.g. a `python` script).
+- **Prefer CLI subcommands over ad-hoc scripts** when logic is plausibly reusable. If you're writing a one-shot Python/Bash script with pluggable inputs (paths, run IDs, dates, etc.), check whether it could land as a subcommand of an existing project CLI, or as a new CLI if no fit exists. This makes it easier to review cmds and auto-approve commeon patterns, and saves recreating the same logic many times. Truly one-shot scripts are fine; consider whether a similar invocation will recur before deciding.
 
-### "Spec" Workflow for Cross-Project Changes
-When I want a Claude session in one project to make changes in another project, I will typically have a separate session run in that project (I avoid having multiple Claude sessions active in any given project/directory).
+### Source / Homedir Management
+- **Read source code from local clones, not file by file over `gh api` / raw.githubusercontent**.
+  - By default: clone repos into GH-org subdirs under `$c`: `$c/{oa,rac,hccs,…}`.
+    - `$js` also has some JS libraries (which partly mirrors https://gitlab.com/runsascoded/js)
+  - If a clone exists but is stale or on another branch, `git fetch <remote>` and read via `git show <remote>/<branch>:<path>` (or a `wt/` worktree).
 
-The main workflow I use for this is for the former session to write a "spec" `.md` file in the latter's directory, which can then be read and implemented by a session that lives there:
-- Write into `specs/` in the root dir of the target project.
-  - After src project writes spec, it's easiest for me to `gs` in dst project to find the new, untracked spec file.
-  - In the target ("dst") project, I usually commit the initial `specs/….md` before starting to implement. Another option is to just stage it. Both approaches allow for editing the spec as implementation proceeds, and decide whether to commit/snapshot the original state of the spec (vs in-progress or done state).
-- When implementation is complete, update the spec to reflect any changes that came up during implementation, move it under `specs/done/`, and commit that alongside the corresponding code changes.
-- If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementation.
+#### "Spec" Workflow for Cross-Project Changes
+When I want a session in one project to make changes in another project, I typically have a separate session run in that project. I usually avoid having multiple sessions active in a single project/directory.
 
-### "Issues" workflow for tracking intra-repo work
-Some projects will choose to use GitHub issues instead of `spec/{,done/}*.md` files.
+One workflow I use involves the former session writing a "spec" `.md` file in a `specs/` directory under the latter's root directory. Latter's session then reads and implements the spec.:
+- After src project writes spec, it's easiest for me to `gs` in dst project to find the new, untracked spec file.
+- In the target ("dst") project, typically commit the initial `specs/….md` before starting to implement (that way evolutions to the spec over the course of review/implementation are tracked in Git).
+- When implementation is complete, update the spec to reflect the final state (including any changes that came up during implementation), move it under `specs/done/`, and commit that alongside the corresponding code changes.
+- If the spec will require multiple commits/phases, do intermediate commits that update `specs/….md` in-place, alongside the partial implementations.
 
-They should be managed with `ghpr` in local `gh/` subdirs. Drafts / Unfiled issues can go in `gh/drafts/<slug>.md` and then will become `gh/XXX/` once "pushed"/filed/created.
+#### "Issues" workflow for tracking intra-repo work
+Draft GitHub issues and PRs using `ghpr` (formerly [standalone](https://github.com/runsascoded/ghpr), now an alias for the `thrds github` group of [`thrds`](https://github.com/runsascoded/thrds), usually cloned at `$c/thrds`). It allows reviewing and submitting changes to issue/PR descriptions and comments, from "clones" in `gh/XXX` dirs. New issues/PRs can also be drafted in `gh/drafts/<slug>.md`, and be moved to `gh/XXX/` once "pushed" (filed/created).
 
 ## Acronyms / Shorthands
 I use these acronyms and abbreviations (generally case-insensitive):
@@ -45,6 +51,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - MD = metadata (or Markdown)
 - BP = boilerplate
 - BM = benchmark
+- OG = OpenGraph, OGI = OpenGraph Image (og:image), dOGI = dynamic OGI (CloudFlare Workers+Assets architecture for webapps where OGI can be generated on-the-fly for any URL path / query params; increasingly my go-to/default www design)
 - CA = content-address{ed,ing} (a.k.a. hash-based)
 - HS = Hammerspoon (macOS automation tool I use)
 - WA = workaround
@@ -78,6 +85,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
   - Sometimes, DS = dataset.
 - LJ = left-justified, similarly RJ (right), CJ (center)
 - CF = Cloudflare, CFW = Cloudflare Worker, D1 = Cloudflare's SQLite-based serverless database, CFP = Cloudflare Pages
+- SL = serverless, SF = serverful
 - CFN = cloud functions (generic; e.g. AWS Lambda, Google Cloud Functions, Cloudflare Workers, etc.)
 - py = python, ts = typescript, js = javascript
 - TFFP = Test-Fail-Fix-Pass: if I say this, I want you to:
@@ -112,7 +120,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - DT / DM / DTM = deterministic, ND or NDM = non-deterministic (for jobs, scripts, etc.)
 - AA = auto-approve (see below), AAG = auto-approve globally
 - a2a = "apples to apples"
-- par = parallel, EP = embarrassingly parallelizable
+- par = parallel, EP = embarrassingly parallelizable, PC = parallel-construct(ion)
 - DL / UL = download / upload
 - imp = improvement, feat = feature
 - ioat = instead of or in addition to
@@ -132,15 +140,28 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - DL(s) = debug log(s)
 - ao = and/or
 - t10n = tokenization
-- n12e = NAI = NI = noninteractive, IA = interactive
+- n12e = NIA = NI = noninteractive, IA = interactive
 - h11n = harmonization
 - AP = anti-pattern
 - bk = bookkeeping
 - RH = rabbit hole
+- aee = all else equal
+- t/s = troubleshoot
+- mt = meantime
+- 1c = 1st-class
+- jtol = just thinking out loud
+- uts = up the stack
+- tbc = to be clear
+- mw = meanwhile
+- cs = case-sensitive, cis = case-insensitive
+- gp = general purpose
+- fw = framework
+- ys = yak shave
+- rh = rabbit hole
+- ph = placeholder
+- 1p = 1st-party, 3p = 3rd-party
 - ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law, RE = reconstruction loss/error (lossy-codec / autoencoder reconstruction quality), VV = VQ-VAE (vector-quantized variational autoencoder)
 - WR = with replacment, WOR = without replacement (i.e. when sampling from a distribution)
-- BT = Boundary Triangle (in H3): the 6 small triangular slivers along each hex parent's edges where parent area and 7-children union geometrically differ. ~5% of parent area; ~7-8% of stations land in one BT or another per level transition. H3 docs ack the issue, library doesn't model BTs first-class (cellToParent is non-exact for points in a BT). For exact aggregation across resolutions, BTs need their own row-buckets or queries stay single-resolution.
-- H13 = ctbk's H3 variant where each parent has 13 disjoint subregions perfectly tiling it: 1 central child hex + 6 fringe children (hex minus outgoing BT) + 6 incoming BTs from sibling parents' children. SR area: 12/84 (central) + 6×11/84 (fringes) + 6×1/84 (incoming BTs) = 84/84. Addressing: `(parent_id, sr_idx ∈ 0..12)`. Lineage exact; monoid sums + query-time subtraction (`count(P) − Σ excluded SRs`) handle partial coverage without needing "all 13 children present" for compaction. See `~/c/pyrmts/specs/pluggable-spatial-backend.md`.
 
 I also use ad hoc single-capital-letter abbreviations, when it should be clear from context what noun (proper or otherwise) I'm referring to.
 
@@ -148,9 +169,35 @@ I also use ad hoc single-capital-letter abbreviations, when it should be clear f
 
 For web/UI projects with a local dev server:
 
-- **CIC by default**: when a change has a visible effect (rendered UI, new route, layout/style tweak, etc.), use the `claude-in-chrome` MCP to load the relevant URL and verify the rendered behavior before returning control. Static reads, type-checks, and test runs do not substitute for actually rendering the UI — they tell you the code is well-formed, not that the feature works.
+- **CIC by default**: when a change has a visible effect (rendered UI, new route, layout/style tweak, etc.), use the `claude-in-chrome` MCP to load the relevant URL and verify the rendered behavior before returning control. Static reads, type-checks, and test runs are good to do but don't substitute for actually rendering the UI.
 - **Include the URL when returning control**: emit a raw URL or markdown anchor-text link to the dev-server path that exercises the change, so I can re-verify the same view. If multiple paths or modes are relevant (different routes, different ports, prod-build vs. dev-server, etc.), list them all and note which exercises what.
-- If you can't CIC (no MCP, no dev server up, can't start one), say so — don't claim to have verified what you only inferred from code.
+- If you can't CIC (no MCP, no dev server up, can't start one), say so — Don't claim to have verified what you only inferred from code.
+
+### Vimium is installed (keystrokes ≠ page input)
+
+All my Chrome profiles run [Vimium] with custom mappings (config: `~/c/.vimium-rc/vimium-options.json`; README there extracts the `keyMappings`). Unfocused keystrokes go to Vimium **normal mode**, not the page — so a `computer type` after a missed click triggers link hints (yellow letter boxes; hint chars `sadfjkl;qweruiopzxcvm/`) or the Vomnibar (`o`/`O`/`e`/`b`/`t`), which lives in a `chrome-extension://` iframe — subsequent MCP typing then errors with "Cannot access a chrome-extension:// URL of different extension". Also `grabBackFocus: true`: Vimium steals focus back from page-autofocused inputs on load, so load-then-type silently lands in normal mode.
+
+Rules for browser automation:
+- **Prefer `form_input` (by ref) over `computer type`** for text entry — it sets values via the DOM and bypasses Vimium entirely.
+- If you must send raw keystrokes: click the target input first and confirm focus took (screenshot/read_page), or press `i` (insert mode: keys pass to the page).
+- **Recovery from a stray-keystroke overlay**: send `Escape` (the MCP's synthetic Esc usually works); if a mode swallows Esc, `ctrl+c` is mapped to `<Escape>` in my config, and `ctrl+]` is `passNextKey`.
+- Some hosts have exclusion/passkey rules (e.g. `localhost:3000` fully excluded) — most dev ports don't, so assume Vimium is active on any page.
+
+[Vimium]: https://github.com/philc/vimium
+
+### Picking the right Chrome profile
+
+I keep ~20 Chrome profiles, one per identity (RAC, OA, HCCS, BikeJC, …), and `list_connected_browsers` labels them opaquely ("Browser 1", "Browser 2", …) — so acting in the wrong one is easy and sometimes costly (signing in / granting OAuth / posting as the wrong account).
+
+**Run `chrome-profiles` (in `~/.rc/osx/`, on `PATH`) before picking a browser**, whenever the task is identity-scoped — anything involving login, an org, a dashboard, or a specific account. It joins the Claude-in-Chrome extension's stored `bridgeDeviceId` (per-profile LevelDB) to Chrome's `Local State` `profile.info_cache`, printing `deviceId | profile dir | name | email`. Chrome needn't be running.
+
+```bash
+chrome-profiles                # full table
+chrome-profiles openathena     # filter (matches deviceId/dir/name/email/displayName)
+chrome-profiles -i openathena  # bare deviceId, for feeding straight to select_browser
+```
+
+Then call `select_browser` with that deviceId, and **say which profile/email you selected** so I can catch a wrong pick before you act in it. If the query doesn't resolve to exactly one profile, ask me rather than guessing. Note the deviceId is only visible on disk — nothing in the Chrome UI surfaces it.
 
 ## Git Usage Conventions
 - **Avoid `git add -A`**: I often have persistent untracked files and directories I don't want to commit. `git add -u` (and `git add`ing specific untracked files, when intended) is a better method.
@@ -171,7 +218,7 @@ For web/UI projects with a local dev server:
 - **Cross-machine sync (p2p, avoiding public hosts)**: I push directly to remote nodes (e.g. an EC2 clone `e`) via `git push <node> <branch>`. The remote isn't bare and has the branch checked out, so the push fast-forwards HEAD but leaves the WT untouched — the WT then shows the just-pushed delta as UCs that look like a "reversion". I run `grhh` (= `git reset --hard HEAD`) on the remote afterward to align the WT to the new HEAD. When I push to a node for you to pick up, tell me to `grhh` over there — don't tell me to `git pull` from a public host. Alternative (`receive.denyCurrentBranch = updateInstead`) auto-updates the WT on push but rejects when WT is dirty, so it sacrifices the ability to have UCs on the remote — I prefer the manual `grhh` flexibility.
 - You're usually in a Git-tracked directory, so you don't need to copy files to "_v2", ".bak", or "_copy" versions when making big changes.
   - Use Git branches instead of `.bak` files or untracked copies of files, `_v2` suffixes, etc.
-- **User branches**: In repos with many other contributors, I use `gpu` (`git push-user-branch`) to push local branches to remote user namespaces
+- **User branches**: In repos with many other contributors, I push local branches to remote targets that include a `rw/` prefix
   - Example: `gpu` on local branch `feat` pushes to `u/rw/feat` (where `rw` is from `GIT_USER_BRANCH_PREFIX`)
   - Variants: `gpuf` (force), `gpun` (dry-run)
   - The script auto-detects the tracking remote or uses `-r <remote>` flag
@@ -183,15 +230,17 @@ For web/UI projects with a local dev server:
   - if the WTs are all symmetric / there's not one that's clearly "main"/default, put a bare clone in the root repo, and have all WTs live in subdirs, named for their branch
     - In some cases, there will be both GH and GL branches with WTs, in which case you might do a structure like `g{h,l}/{main,v1}` (e.g. in the case of `scrns`, where I have GH and GL mirrors, each with a `main` branch and `v1` reusable CI workflow orphan-branch).
 
-### [`ghpr`] ([`ghpr-py`])
+### `ghpr` (= `thrds github`, part of [`thrds`])
 > "Clone" GitHub PRs/issues, locally edit title/description/comments, "push" back to GitHub, and mirror to Gists.
+
+`ghpr` began as a [standalone tool][ghpr-orig] but is now the `thrds github` subcommand group of [`thrds`] (cloned at `$c/thrds`); installing `thrds` installs the `ghpr` entry point, and all existing invocations/aliases keep working.
 
 I `ghpr clone` (`ghprc`) GitHub PRs and issues to local directories for editing, make commits in local Git repos for each (`gh/` generally just left untracked by parent project, or added to `.git/info/exclude`), then `ghpr push` (`ghprp`) them back to GitHub (and a Gist that mirrors each). This allows me to edit PR/issue titles, descriptions, and comments in my local editor, with the full power of Markdown and no character limits, and then sync those changes back to GitHub.
 
 If I ask you update a PR or issue title, description, or comment, check if it's already "cloned" under `gh/` (from actual project's root). If it is, make edits there (and commit, typically, then prompt me to review diffs with `ghprd` and `ghprp` push).
 
-[`ghpr`]: https://github.com/runsascoded/ghpr
-[`ghpr-py`]: https://pypi.org/project/ghpr-py/
+[`thrds`]: https://github.com/runsascoded/thrds
+[ghpr-orig]: https://github.com/runsascoded/ghpr
 
 ## Auto-Approve (AA)
 A `PreToolUse` hook (`~/.claude/hooks/auto-approve-bash`) auto-approves Bash commands based on YAML rule specs, so I don't have to manually approve every safe command.
@@ -385,7 +434,7 @@ If none of the patterns above apply and `in` genuinely is the right tool (rare �
 ## JavaScript / TypeScript / Node.js / Web Development
 - Use `pnpm` for package management, not `npm` (e.g., `pnpm install`, `pnpm add <package>`)
 - I usually use Vite, TS, React, and SASS. Vite projects should have script `    "clean": "rm -rf node_modules/.vite dist"`
-- I ≈always want @floating-ui/react Tooltips, not browser-native tooltips. The latter take too long to appear, and are too small/flat/unstyleable/plain.
+- I ≈always want @floating-ui/react Tooltips (React Tooltips, "rTT"s), not browser-native tooltips. The latter take too long to appear, and are too small/flat/unstyleable/plain.
 - Similarly, tanstack/react-query is my go-to for data fetching and caching in React apps; DIY `useEffect` should be used sparingly / graduate to "TSQ" early in projects' life.
 - Each project should default its dev (or built) servers to a hopefully-unique, unused port (not Vite's default 5173, slidev's 3030, http-server's 8080, Wrangler's 8787/8788, etc.) to avoid conflicts when running multiple projects simultaneously on a given host. **For CFW projects**: pass `--port` to `wrangler dev` (or set `dev.port` in `wrangler.toml`) — pick something distinct, ideally `+1` (or other small offset) of the project's main FE port so the pair is colocated and easy to remember (e.g. FE=3456, wrangler=3457).
   - A nice trick is to hash the project name, and mod that into an eligible range of port numbers.
@@ -398,18 +447,30 @@ If none of the patterns above apply and `in` genuinely is the right tool (rare �
 My `vite.config.ts` will usually do something like:
 
 ```ts
-const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',') ?? []
-
 export default defineConfig({
   server: {
     port: 3201,  // ≈unique to project, hash project name to pick a port number in a reasonable range, use that as default
     host: true,
-    allowedHosts,
+    allowedHosts: true,  // accept any Host; trusted-tailnet dev server, reached by bare MagicDNS name
   },
 })
 ```
 
-so that my tailnet can access dev servers (via `$VITE_ALLOWED_HOSTS`, which my dotfiles set).
+Use `allowedHosts: true` for dev servers. I reach them by bare MagicDNS short name (e.g. `m3:3201`), which is the machine's **Tailscale device name** — independent of `os.hostname()` (my M3 laptop's system hostname is `mac.lan`, its tailnet name `m3`), so neither a `.rbw.sh` wildcard nor an `os.hostname()`-derived allowlist can cover it. `true` disables Vite's DNS-rebinding check, which is fine for a personal dev server on a trusted tailnet. (`$VITE_ALLOWED_HOSTS` / an explicit allowlist is only worth it if a dev server is exposed somewhere untrusted.)
+
+### Playwright (PW)
+
+**Never run bare `playwright install` — use `pw-install` (`pwi`, in `~/.rc/js/`).**
+
+PW vendors `extract-zip`, which **hangs on Node ≥23** (verified 2026-08-28, Node 26.7.0 / macOS arm64): the browser zip downloads fine, then extraction stalls at 0% CPU after ~2 files, indefinitely. `pw-install` runs the install under the newest Node ≤22 it finds in `~/.nvm/versions/node` (`PW_NODE=` overrides), then warns about any browser dir left without an `INSTALLATION_COMPLETE` marker. Tests themselves run fine on Node 26 — only the install step needs pinning.
+
+Three things that make this hard to diagnose, worth knowing before chasing a different theory:
+
+- **Silent and self-perpetuating.** A hung extraction leaves a browser dir with no `INSTALLATION_COMPLETE`. PW's GC (`_deleteStaleBrowsers`) deletes unmarked dirs at the *start* of the next install — so builds seem to vanish at random, each retry re-downloads, and the symptom surfaces much later as `Executable doesn't exist at …`.
+- **Not a version-spread problem.** `~/Library/Caches/ms-playwright` is machine-global and my repos span many PW versions, but the GC's keep-set is built from *every* registered `.links` entry, so builds required by different repos coexist fine. Spread costs disk, not evictions. Upgrading PW doesn't help either — 1.58.2 and 1.59.1 hang identically in a clean `PLAYWRIGHT_BROWSERS_PATH`.
+- **Do delete a repo's `node_modules` with care**: that breaks its `.links` entry, and browsers only it referenced then *are* GC'd legitimately.
+
+Recovery when an extraction has already hung: the downloaded zip is complete under `$TMPDIR/playwright-download-*/`. Copy it out, kill the installer, `unzip` it into the target dir (~2s vs. forever), and `touch INSTALLATION_COMPLETE DEPENDENCIES_VALIDATED` so the GC accepts it.
 
 ### Frequently Used JS/TS Tools and Libraries
 `$js` (`~/c/js`) is a root dir for JS/TS projects I maintain, most of which live under https://gitlab.com/runsascoded/js.
@@ -432,7 +493,7 @@ Several tools I often use while developing other applications and libraries:
 
 And a few libraries I often use in JS/TS apps:
 - [`use-kbd`] (https://github.com/runsascoded/use-kbd): Omnibars, editable hotkeys, search, and keyboard-navigation for React apps.
-  - SpeedDial ("SD") is a lower-right widget I usually add to my apps: search icon + caret on top to expand other buttons (GH link, theme cycler, ShortcutsModal button) 
+  - SpeedDial ("SD") is a lower-right widget I usually add to my apps: search icon + caret on top to expand other buttons (GH link, theme cycler, ShortcutsModal button)
 - [`use-prms`] (https://github.com/runsascoded/use-prms): React hooks for managing URL query parameters with type-safe encoding/decoding
 
 [`use-kbd`]: https://www.npmjs.com/package/use-kbd
