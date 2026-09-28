@@ -481,6 +481,70 @@ class TestMatchRules:
         assert match_rules('ssh host "ls /foo"', rules) is None
 
 
+# ── ssh-rules host scoping ──────────────────────────────────────
+
+class TestSshHostScoping:
+    @pytest.fixture()
+    def rules(self):
+        return [{"allow": "ssh"}]
+
+    def test_no_host_key_applies_everywhere(self, rules):
+        ssh_rules = [{"allow": "ls"}]
+        assert match_rules('ssh a "ls /foo"', rules, ssh_rules) == "allow"
+        assert match_rules('ssh b "ls /foo"', rules, ssh_rules) == "allow"
+
+    def test_host_string_scopes_to_that_host(self, rules):
+        ssh_rules = [{"allow": "ls", "host": "a"}]
+        assert match_rules('ssh a "ls /foo"', rules, ssh_rules) == "allow"
+        assert match_rules('ssh b "ls /foo"', rules, ssh_rules) is None
+
+    def test_host_list_is_membership(self, rules):
+        ssh_rules = [{"allow": "ls", "host": ["a", "b"]}]
+        assert match_rules('ssh a "ls /foo"', rules, ssh_rules) == "allow"
+        assert match_rules('ssh b "ls /foo"', rules, ssh_rules) == "allow"
+        assert match_rules('ssh c "ls /foo"', rules, ssh_rules) is None
+
+    def test_bare_host_spec_matches_user_at_host(self, rules):
+        ssh_rules = [{"allow": "ls", "host": "a"}]
+        assert match_rules('ssh ryan@a "ls /foo"', rules, ssh_rules) == "allow"
+
+    def test_user_qualified_spec_requires_that_user(self, rules):
+        ssh_rules = [{"allow": "ls", "host": "ryan@a"}]
+        assert match_rules('ssh ryan@a "ls /foo"', rules, ssh_rules) == "allow"
+        assert match_rules('ssh a "ls /foo"', rules, ssh_rules) is None
+        assert match_rules('ssh root@a "ls /foo"', rules, ssh_rules) is None
+
+    def test_nested_ssh_refilters_for_inner_host(self, rules):
+        """`ssh a "ssh b …"` must evaluate the inner command under b's entries only."""
+        ssh_rules = [{"allow": "ls", "host": "a"}, {"allow": "ssh"}]
+        assert match_rules('ssh a "ls /foo"', rules, ssh_rules) == "allow"
+        assert match_rules('ssh a "ssh b \\"ls /foo\\""', rules, ssh_rules) is None
+
+    def test_nested_ssh_keeps_only_host_agnostic_entries(self, rules):
+        """Filtering is cumulative per hop, so a chain reaches only unscoped entries.
+
+        `b`'s entry is dropped by the *outer* filter (host `a`) before the inner
+        hop ever runs — scoped entries are unreachable through a jump. Only
+        entries with no `host:` survive both filters.
+        """
+        scoped_to_inner = [{"allow": "ls", "host": "b"}, {"allow": "ssh"}]
+        assert match_rules('ssh a "ssh b \\"ls /foo\\""', rules, scoped_to_inner) is None
+        unscoped = [{"allow": "ls"}, {"allow": "ssh"}]
+        assert match_rules('ssh a "ssh b \\"ls /foo\\""', rules, unscoped) == "allow"
+
+    def test_deny_can_be_host_scoped(self, rules):
+        ssh_rules = [{"deny": "rm", "host": "prod"}, {"allow": "rm"}]
+        assert match_rules('ssh prod "rm /foo"', rules, ssh_rules) == "deny"
+        assert match_rules('ssh dev "rm /foo"', rules, ssh_rules) == "allow"
+
+    def test_malformed_host_spec_never_matches(self):
+        from auto_approve import _host_matches
+        assert _host_matches(None, "a") is True
+        assert _host_matches("a", "a") is True
+        assert _host_matches(17, "a") is False
+        assert _host_matches({"name": "a"}, "a") is False
+
+
 # ── Full evaluation ──────────────────────────────────────────────
 
 class TestEvaluateCommand:

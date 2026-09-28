@@ -577,6 +577,23 @@ def _match_trie(tokens: list[str], trie: dict) -> bool:
     return False
 
 
+def _host_matches(spec, host: str) -> bool:
+    """ssh-rules `host:` scoping: absent → all hosts; str → exact; list → membership.
+
+    `host` is the raw ssh target, so `ssh user@h` yields `user@h`. A bare
+    `host: h` spec is matched against both that and its user-stripped form; a
+    spec that itself carries `user@` matches only the raw target.
+    """
+    if spec is None:
+        return True
+    candidates = {host, host.split("@", 1)[-1]}
+    if isinstance(spec, str):
+        return spec in candidates
+    if isinstance(spec, list):
+        return bool(candidates & set(spec))
+    return False
+
+
 def match_rules(
     command: str,
     rules: list[dict],
@@ -593,7 +610,15 @@ def match_rules(
     if ssh_host is not None:
         if ssh_rules is None:
             return None
-        return evaluate_command(command, ssh_rules=ssh_rules, rules=ssh_rules)
+        # `host:` on an ssh-rules entry scopes it to that host (str or list);
+        # entries without `host:` apply to every host. Filtering here (rather
+        # than tagging) means a nested `ssh other …` inside a scoped host
+        # re-filters and correctly drops the outer host's entries.
+        scoped = [
+            r for r in ssh_rules
+            if isinstance(r, dict) and _host_matches(r.get("host"), ssh_host)
+        ]
+        return evaluate_command(command, ssh_rules=scoped, rules=scoped)
 
     tokens = shlex_split_safe(command)
 
