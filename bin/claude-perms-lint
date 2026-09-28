@@ -1,0 +1,157 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["click", "utz"]
+# ///
+"""Lint Claude Code permission rules for mid-command wildcards.
+
+Reimplements Claude Code's own startup validator (v2.1.247, minified `ss()`):
+a `Bash(...)` *allow* rule warns when an unescaped `*` appears in some token and
+a later token is a real argument (not a flag, not a shell operator). Such a rule
+also approves any options injected at the wildcard's position.
+
+    claude-perms-lint                      # this project's .claude/settings*.json
+    claude-perms-lint -a                   # every settings file under ~/c and ~/.claude
+    claude-perms-lint -f .claude/settings.local.json   # drop offending rules
+"""
+import json
+import re
+import sys
+from functools import partial
+from pathlib import Path
+
+from click import argument, command, option
+
+err = partial(print, file=sys.stderr)
+
+HOME = Path.home()
+OPERATOR = re.compile(r'^(?:[|&;<>]|\d+[<>])')
+
+
+def escaped(s: str, i: int) -> bool:
+    """True if s[i] is preceded by an odd number of backslashes."""
+    n = 0
+    j = i - 1
+    while j >= 0 and s[j] == '\\':
+        n += 1
+        j -= 1
+    return n % 2 != 0
+
+
+def has_wildcard(tok: str) -> bool:
+    return any(c == '*' and not escaped(tok, i) for i, c in enumerate(tok))
+
+
+def mid_wildcard(rule_content: str) -> str | None:
+    """Return the command name if this rule body trips Claude Code's warning."""
+    if rule_content.endswith(':*'):
+        return None
+    toks = [t for t in rule_content.strip().split() if t]
+    if len(toks) < 3 or has_wildcard(toks[0]):
+        return None
+    seen = False
+    for tok in toks[1:]:
+        if OPERATOR.match(tok):
+            return None
+        if has_wildcard(tok):
+            seen = True
+            continue
+        if tok.startswith('-'):
+            continue
+        return toks[0] if seen else None
+    return None
+
+
+def offenders(path: Path) -> list[str]:
+    """Offending `Bash(...)` allow rules in a settings file, in file order."""
+    perms = json.loads(path.read_text()).get('permissions') or {}
+    out = []
+    for rule in perms.get('allow') or []:
+        if not isinstance(rule, str) or not rule.startswith('Bash(') or not rule.endswith(')'):
+            continue
+        if mid_wildcard(rule[len('Bash('):-1]):
+            out.append(rule)
+    return out
+
+
+PRUNE = {'node_modules', '.git', '.venv', 'venv', 'dist', 'build', 'target', '__pycache__', 'wt'}
+
+
+def settings_files(roots: list[Path], max_depth: int = 4) -> list[Path]:
+    """Find .claude/settings*.json under roots, pruning heavy dirs."""
+    seen = {}
+
+    def walk(d: Path, depth: int):
+        try:
+            entries = list(d.iterdir())
+        except OSError:
+            return
+        for e in entries:
+            if not e.is_dir() or e.is_symlink():
+                continue
+            if e.name == '.claude':
+                for f in sorted(e.glob('settings*.json')):
+                    seen[f.resolve()] = f
+                continue
+            if e.name in PRUNE or depth >= max_depth:
+                continue
+            walk(e, depth + 1)
+
+    for root in roots:
+        if (root / '.claude').is_dir():
+            for f in sorted((root / '.claude').glob('settings*.json')):
+                seen[f.resolve()] = f
+        walk(root, 0)
+    return sorted(seen.values())
+
+
+def rel(path: Path) -> str:
+    try:
+        return f'~/{path.relative_to(HOME)}'
+    except ValueError:
+        return str(path)
+
+
+@command(help=__doc__)
+@option('-a', '--all', 'scan_all', is_flag=True, help='Scan every settings file under ~/c and ~/.claude')
+@option('-f', '--fix', is_flag=True, help='Delete offending rules (rewrites the file, 2-space indent)')
+@argument('paths', nargs=-1, type=Path)
+def main(scan_all: bool, fix: bool, paths: tuple[Path, ...]):
+    if scan_all:
+        files = settings_files([HOME / 'c', HOME / '.claude'])
+    elif paths:
+        files = list(paths)
+    else:
+        files = [p for p in (Path('.claude/settings.local.json'), Path('.claude/settings.json')) if p.exists()]
+        if not files:
+            err('No .claude/settings*.json here; pass paths or -a')
+            sys.exit(1)
+
+    total = 0
+    for path in files:
+        try:
+            bad = offenders(path)
+        except (json.JSONDecodeError, OSError) as e:
+            err(f'!! {rel(path)}: {e}')
+            continue
+        if not bad:
+            continue
+        total += len(bad)
+        print(f'{rel(path)}  ({len(bad)})')
+        for rule in bad:
+            print(f'  {rule}')
+        if fix:
+            obj = json.loads(path.read_text())
+            drop = set(bad)
+            allow = obj['permissions']['allow']
+            obj['permissions']['allow'] = [r for r in allow if r not in drop]
+            path.write_text(json.dumps(obj, indent=2) + '\n')
+            print(f'  -> removed {len(bad)}, {len(allow)} -> {len(obj["permissions"]["allow"])} allow rules')
+        print()
+
+    print(f'{total} mid-command wildcard rule(s) across {len(files)} file(s)')
+    sys.exit(1 if total and not fix else 0)
+
+
+if __name__ == '__main__':
+    main()
