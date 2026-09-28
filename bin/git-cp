@@ -1,0 +1,523 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["click", "pyyaml"]
+# ///
+"""Cherry-pick bookkeeping for long-lived peer branches.
+
+Peer branches are parallel forks of one another (no base branch); features and
+fixes land on whichever one happened to be checked out and get adapted onto the
+others. A *cursor* records, per ordered pair, how far along a peer that branch
+has assessed — ported or deliberately skipped — so the next pass only looks at
+what arrived since.
+
+Cursors live in two places; whichever sits further along the peer wins:
+
+  ref     `refs/cp/<branch>%<peer>` — cheap, and settable by a pass that
+          assessed a peer but ported nothing (which leaves no commit to mark)
+  marker  ``[CP cursor: <peer> `<sha>`]`` in a subject, or a `CP-cursor: <peer>
+          <sha>` trailer — the reviewable record, and what survives a clone
+
+Config: `.claude/cp.yml` at the repo root (`git cp init`).
+"""
+
+import json
+import re
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from functools import partial
+from pathlib import Path
+
+import yaml
+from click import Group, UsageError, argument, group, option
+
+err = partial(print, file=sys.stderr)
+
+RS = '\x1e'  # record separator
+FS = '\x1f'  # field separator
+
+MARKER_RE = re.compile(r'\[CP cursor:\s*(?P<peer>[^\s\]`]+)\s+`?(?P<sha>[0-9a-f]{7,40})`?\s*\]')
+TRAILER_RE = re.compile(r'^CP-cursor:\s*(?P<peer>\S+)\s+`?(?P<sha>[0-9a-f]{7,40})`?\s*$', re.M)
+OUTBOUND_RE = re.compile(r'\[CP\s*(?:→|->)\s*(?P<target>[^\]]+?)\s*\]')
+
+SCAFFOLD = """\
+# Long-lived peer branches that cherry-pick from each other (`/cp`).
+# Every branch listed here is a peer of every other one.
+branches:
+  main: {}
+
+# Optional: paths whose changes are worth calling out per commit.
+# surfaces: [src, tests]
+
+# Optional pointers, surfaced by the `/cp` skill.
+# ledger: specs/branch-parity-discipline.md
+# audit: scripts/branch-audit
+"""
+
+
+def git(*args: str, root: Path, check: bool = True) -> str:
+    r = subprocess.run(['git', '-C', str(root), *args], capture_output=True, text=True)
+    if check and r.returncode:
+        raise RuntimeError(f"git {' '.join(args)} failed: {r.stderr.strip()}")
+    return r.stdout
+
+
+def rev_parse(root: Path, ref: str) -> str | None:
+    r = subprocess.run(['git', '-C', str(root), 'rev-parse', '-q', '--verify', f'{ref}^{{commit}}'],
+                       capture_output=True, text=True)
+    return r.stdout.strip() or None
+
+
+def is_ancestor(root: Path, sha: str, ref: str) -> bool:
+    return subprocess.run(['git', '-C', str(root), 'merge-base', '--is-ancestor', sha, ref],
+                          capture_output=True).returncode == 0
+
+
+def repo_root() -> Path:
+    return Path(git('rev-parse', '--show-toplevel', root=Path.cwd()).strip())
+
+
+def common_dir(root: Path) -> Path:
+    return Path(git('rev-parse', '--path-format=absolute', '--git-common-dir', root=root).strip())
+
+
+def config_path(root: Path) -> Path:
+    """`<worktree>/.claude/cp.yml`, else the main worktree's copy.
+
+    `.claude/` is commonly gitignored, so a linked worktree won't carry one.
+    """
+    here = root / '.claude' / 'cp.yml'
+    if here.exists():
+        return here
+    main = common_dir(root).parent / '.claude' / 'cp.yml'
+    return main if main.exists() else here
+
+
+def load_config(root: Path, config: str | None = None) -> dict:
+    path = Path(config).expanduser() if config else config_path(root)
+    if not path.exists():
+        err(f'No {path}. Run `git cp init` and list the peer branches.')
+        sys.exit(1)
+    cfg = yaml.safe_load(path.read_text()) or {}
+    if not cfg.get('branches'):
+        err(f'{path}: no `branches:` mapping')
+        sys.exit(1)
+    return cfg
+
+
+def current_branch(root: Path) -> str:
+    head = git('rev-parse', '--abbrev-ref', 'HEAD', root=root).strip()
+    if head == 'HEAD':
+        err('detached HEAD — check out a branch')
+        sys.exit(1)
+    return head
+
+
+# ---- "same args as last time" -----------------------------------------------
+
+def last_args_file(root: Path) -> Path:
+    return common_dir(root) / 'cp-last.json'
+
+
+def recall(root: Path, branch: str) -> list[str]:
+    """Peers passed the last time this branch was surveyed."""
+    path = last_args_file(root)
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text()).get(branch) or []
+    except json.JSONDecodeError:
+        return []
+
+
+def remember(root: Path, branch: str, peers: list[str]) -> None:
+    path = last_args_file(root)
+    try:
+        state = json.loads(path.read_text()) if path.exists() else {}
+    except json.JSONDecodeError:
+        state = {}
+    state[branch] = peers
+    path.write_text(json.dumps(state, indent=2, sort_keys=True) + '\n')
+
+
+# ---- commits ----------------------------------------------------------------
+
+@dataclass
+class Commit:
+    sha: str
+    subject: str
+    body: str
+    files: list[str] = field(default_factory=list)
+
+    @property
+    def short(self) -> str:
+        return self.sha[:9]
+
+    @property
+    def clean_subject(self) -> str:
+        """Subject with any trailing cursor marker stripped."""
+        return MARKER_RE.sub('', self.subject).strip()
+
+
+def log(root: Path, *rev_args: str, files: bool = True) -> list[Commit]:
+    """Commits in a range, oldest first, optionally with the files each touches."""
+    meta = git('log', '--reverse', '--no-merges', f'--format={RS}%H{FS}%s{FS}%b', *rev_args, root=root)
+    commits: dict[str, Commit] = {}
+    for rec in meta.split(RS)[1:]:
+        sha, subject, body = rec.split(FS, 2)
+        commits[sha] = Commit(sha, subject.strip(), body.strip())
+    if files:
+        names = git('log', '--reverse', '--no-merges', f'--format={RS}%H', '--name-only', *rev_args, root=root)
+        for rec in names.split(RS)[1:]:
+            lines = [l for l in rec.strip().split('\n') if l]
+            if lines and (c := commits.get(lines[0])):
+                c.files = lines[1:]
+    return list(commits.values())
+
+
+# ---- cursors ----------------------------------------------------------------
+
+def peer_names(peer: str, pcfg: dict) -> set[str]:
+    """Names a cursor marker might use for this peer."""
+    return {peer, peer.split('/')[-1], *(pcfg.get('aliases') or [])}
+
+
+def cursor_ref(branch: str, peer: str) -> str:
+    return f'refs/cp/{branch}%{peer}'
+
+
+def read_marker(commits: list[Commit], peer: str, pcfg: dict) -> tuple[Commit, str] | None:
+    """Newest cursor marker for `peer` among `commits` (oldest-first)."""
+    names = peer_names(peer, pcfg)
+    for c in reversed(commits):
+        text = c.subject + '\n' + c.body
+        for m in [*MARKER_RE.finditer(text), *TRAILER_RE.finditer(text)]:
+            if m['peer'] in names:
+                return c, m['sha']
+    return None
+
+
+@dataclass
+class Cursor:
+    sha: str
+    source: str            # 'ref' | 'marker'
+    at: str | None = None  # commit carrying the marker
+
+    @property
+    def via(self) -> str:
+        return self.source + (f' on {self.at}' if self.at else '')
+
+
+def resolve_cursor(root: Path, branch: str, peer: str, pcfg: dict,
+                   commits: list[Commit]) -> tuple[Cursor | None, list[str]]:
+    """The furthest-along valid cursor for branch→peer, plus warnings about stale ones."""
+    found, stale = [], []
+    if sha := rev_parse(root, cursor_ref(branch, peer)):
+        (found if is_ancestor(root, sha, peer) else stale).append(Cursor(sha, 'ref'))
+    if m := read_marker(commits, peer, pcfg):
+        commit, short = m
+        full = rev_parse(root, short)
+        c = Cursor(full or short, 'marker', commit.short)
+        (found if full and is_ancestor(root, full, peer) else stale).append(c)
+
+    warnings = [f'{c.source} cursor {c.sha[:9]} is not on {peer} (rebased?) — ignored' for c in stale]
+    if not found:
+        return None, warnings
+    best = found[0]
+    for c in found[1:]:
+        if is_ancestor(root, best.sha, c.sha):
+            best = c
+    return best, warnings
+
+
+# ---- survey -----------------------------------------------------------------
+
+def surfaces_of(files: list[str], surfaces: list[str]) -> list[str]:
+    """Configured surfaces the commit touches, plus top-level dirs for anything outside them."""
+    def under(f: str, s: str) -> bool:
+        return f == s or f.startswith(s.rstrip('/') + '/')
+
+    hit = [s for s in surfaces if any(under(f, s) for f in files)]
+    rest = sorted({f.split('/')[0] for f in files if not any(under(f, s) for s in surfaces)})
+    return hit + rest
+
+
+def survey(root: Path, head: str, peer: str, cfg: dict, files: bool = True) -> dict:
+    """Commits on `peer` that `head` lacks, annotated with evidence they were already ported."""
+    peer_sha = rev_parse(root, peer)
+    if not peer_sha:
+        return {'peer': peer, 'error': 'ref not found (git fetch?)', 'todo': None}
+
+    merge_base = git('merge-base', head, peer, root=root).strip()
+    head_commits = log(root, f'{merge_base}..{head}', files=False)
+    cursor, warnings = resolve_cursor(root, head, peer, cfg['branches'].get(peer) or {}, head_commits)
+    base = cursor.sha if cursor else merge_base
+
+    candidates = log(root, f'{base}..{peer}', files=files)
+
+    # Evidence a candidate is already on `head`, strongest first:
+    #   =  git-cherry found an equivalent patch already applied
+    #   @  its abbreviated sha is cited in a head-side commit body (the adapted-CP signal)
+    #   ~  an identical subject exists on head
+    equivalent = {
+        line[2:].strip()
+        for line in git('cherry', head, peer, merge_base, root=root, check=False).splitlines()
+        if line.startswith('-')
+    }
+    head_text = '\n'.join(c.subject + '\n' + c.body for c in head_commits)
+    head_subjects = {c.clean_subject for c in head_commits}
+
+    rows = []
+    for c in candidates:
+        marks = ''.join((
+            '=' if c.sha in equivalent else '',
+            '@' if re.search(rf'\b{c.sha[:7]}[0-9a-f]*\b', head_text) else '',
+            '~' if c.clean_subject in head_subjects else '',
+        ))
+        rows.append({
+            'sha': c.sha,
+            'short': c.short,
+            'subject': c.subject,
+            'marks': marks,
+            'ported': bool(marks),
+            'surfaces': surfaces_of(c.files, surfaces_cfg(cfg)),
+            'files': len(c.files),
+            'outbound': sorted({m['target'] for m in OUTBOUND_RE.finditer(c.subject + '\n' + c.body)}),
+        })
+
+    return {
+        'peer': peer,
+        'peer_sha': peer_sha,
+        'merge_base': merge_base,
+        'cursor': cursor.__dict__ if cursor else None,
+        'warnings': warnings,
+        'base': base,
+        'candidates': rows,
+        'todo': sum(not r['ported'] for r in rows),
+    }
+
+
+def surfaces_cfg(cfg: dict) -> list[str]:
+    return cfg.get('surfaces') or []
+
+
+def render(s: dict, verbose: bool) -> None:
+    if e := s.get('error'):
+        print(f"## {s['peer']}: {e}\n")
+        return
+    print(f"## {s['peer']}  ({s['peer_sha'][:9]})")
+    if c := s['cursor']:
+        src = c['source'] + (f" on {c['at']}" if c['at'] else '')
+        print(f"   cursor {c['sha'][:9]} ({src}) — surveying {s['base'][:9]}..{s['peer']}")
+    else:
+        print(f"   no cursor — surveying from merge-base {s['merge_base'][:9]} "
+              f"(expect noise; `git cp set {s['peer']}` when this pass is done)")
+    for w in s['warnings']:
+        print(f'   !! {w}')
+
+    rows = s['candidates']
+    if not rows:
+        print('   nothing new\n')
+        return
+    for r in (rows if verbose else [r for r in rows if not r['ported']]):
+        flag = f"[{r['marks']}]" if r['marks'] else '   '
+        surf = ','.join(r['surfaces']) or '-'
+        out = f"  ⇒ {' '.join(r['outbound'])}" if r['outbound'] else ''
+        print(f"   {flag} {r['short']}  {r['subject'][:96]}")
+        print(f"        {surf}  ({r['files']} files){out}")
+    print(f"\n   {s['todo']} to triage, {len(rows) - s['todo']} with port evidence (-v to list)\n")
+
+
+# ---- CLI --------------------------------------------------------------------
+
+class DefaultGroup(Group):
+    """A Group whose first positional falls through to `survey` when it isn't a subcommand."""
+
+    default = 'survey'
+
+    def parse_args(self, ctx, args):
+        if not args or (args[0] not in self.commands and args[0] not in ('-h', '--help')):
+            args = [self.default, *args]
+        return super().parse_args(ctx, args)
+
+    def resolve_command(self, ctx, args):
+        try:
+            return super().resolve_command(ctx, args)
+        except UsageError:
+            return self.default, self.commands[self.default], args
+
+
+@group(cls=DefaultGroup, context_settings={'help_option_names': ['-h', '--help']})
+def cli() -> None:
+    """Cherry-pick bookkeeping for long-lived peer branches."""
+
+
+@cli.command()
+def init() -> None:
+    """Write a starter .claude/cp.yml."""
+    path = repo_root() / '.claude' / 'cp.yml'
+    if path.exists():
+        err(f'{path} exists')
+        sys.exit(1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(SCAFFOLD)
+    err(f'wrote {path}')
+
+
+@cli.command('survey')
+@option('-a', '--all', 'every', is_flag=True, help='Every peer, ignoring the remembered set')
+@option('-c', '--config', help='Path to cp.yml (default: <repo>/.claude/cp.yml)')
+@option('-f', '--fetch', is_flag=True, help='Fetch the remotes backing the peer refs first')
+@option('-j', '--json', 'as_json', is_flag=True, help='Emit JSON instead of a table')
+@option('-v', '--verbose', is_flag=True, help='Also list commits that already show port evidence')
+@argument('peers', nargs=-1)
+def survey_cmd(every: bool, config: str | None, fetch: bool, as_json: bool, verbose: bool,
+               peers: tuple[str, ...]) -> None:
+    """Survey cherry-pick candidates from peer branches onto the current branch.
+
+    With no PEERS, reuses the set from the last survey on this branch; `-a` for all.
+    """
+    root = repo_root()
+    cfg = load_config(root, config)
+    head = current_branch(root)
+    others = [b for b in cfg['branches'] if b != head]
+
+    targets, why = list(peers), ''
+    if not targets and not every:
+        if remembered := [p for p in recall(root, head) if p != head]:
+            targets, why = remembered, ' (same as last time; -a for all)'
+    if not targets:
+        targets = others
+    if head not in cfg['branches']:
+        err(f'warning: {head} is not in the config; treating every configured branch as a peer')
+
+    if fetch:
+        remotes = {b.split('/')[0] for b in targets if '/' in b}
+        remotes |= {r for b in targets if (r := (cfg['branches'].get(b) or {}).get('remote'))}
+        for r in sorted(remotes):
+            err(f'fetching {r}…')
+            git('fetch', r, root=root, check=False)
+
+    surveys = [survey(root, head, p, cfg) for p in targets]
+    if peers:
+        remember(root, head, list(peers))
+
+    if as_json:
+        print(json.dumps({'branch': head, 'surveys': surveys}, indent=2))
+        return
+    print(f'# CP survey onto `{head}`{why}  ({root})\n')
+    for s in surveys:
+        render(s, verbose)
+    print('marks: = patch-equivalent already applied · @ sha cited in a commit body · ~ identical subject')
+
+
+
+@cli.command()
+@option('-c', '--config', help='Path to cp.yml')
+def matrix(config: str | None) -> None:
+    """Show every branch's cursor against every other, with backlog counts."""
+    root = repo_root()
+    cfg = load_config(root, config)
+    branches = list(cfg['branches'])
+    head = current_branch(root)
+
+    cells: dict[tuple[str, str], str] = {}
+    for a in branches:
+        if not rev_parse(root, a):
+            continue
+        for b in branches:
+            if a == b:
+                continue
+            s = survey(root, a, b, cfg, files=False)
+            if s.get('error'):
+                cells[a, b] = '?'
+                continue
+            cur = s['cursor']['sha'][:7] if s['cursor'] else '—'
+            cells[a, b] = f"{cur} {'✓' if not s['todo'] else s['todo']}"
+
+    w = max(len(b) for b in branches) + 2
+    cw = max([len(v) for v in cells.values()] + [len(b) for b in branches]) + 2
+    print(f'# CP cursors  ({root})\n')
+    print(' ' * (w + 2) + ''.join(b.ljust(cw) for b in branches))
+    for a in branches:
+        mark = '*' if a == head else ' '
+        row = ''.join((cells.get((a, b)) or '·').ljust(cw) if a != b else '·'.ljust(cw) for b in branches)
+        print(f'{mark} {a.ljust(w)}{row}')
+    print('\nrows assess columns; cell = cursor + commits left to triage. * = current branch.')
+
+
+@cli.command('set')
+@option('-b', '--branch', help='Set the cursor for this branch instead of the current one')
+@option('-c', '--config', help='Path to cp.yml')
+@option('-n', '--dry-run', is_flag=True, help='Print what would change')
+@argument('peer')
+@argument('sha', required=False)
+def set_(branch: str | None, config: str | None, dry_run: bool, peer: str, sha: str | None) -> None:
+    """Record that PEER has been assessed up to SHA (default: its tip).
+
+    Use this when a pass assessed a peer but ported nothing — there is no commit
+    to hang a `[CP cursor: ...]` marker on, and the next pass should not re-triage
+    what this one already rejected.
+    """
+    root = repo_root()
+    cfg = load_config(root, config)
+    br = branch or current_branch(root)
+    if peer not in cfg['branches']:
+        err(f'warning: {peer} is not in the config')
+    target = rev_parse(root, sha or peer)
+    if not target:
+        err(f'cannot resolve {sha or peer}')
+        sys.exit(1)
+    if not is_ancestor(root, target, peer):
+        err(f'{target[:9]} is not on {peer}')
+        sys.exit(1)
+
+    old = rev_parse(root, cursor_ref(br, peer))
+    if old == target:
+        err(f'{br} → {peer}: already at {target[:9]}')
+        return
+    if old and not is_ancestor(root, old, target):
+        err(f'warning: moving {br} → {peer} backwards ({old[:9]} is not an ancestor of {target[:9]})')
+    if dry_run:
+        err(f'would set {br} → {peer}: {old[:9] if old else "—"} → {target[:9]}')
+        return
+    git('update-ref', cursor_ref(br, peer), target, root=root)
+    err(f'{br} → {peer}: {old[:9] if old else "—"} → {target[:9]}')
+
+
+
+@cli.command()
+@option('-c', '--config', help='Path to cp.yml')
+@option('-n', '--dry-run', is_flag=True, help='Print what would change')
+def sync(config: str | None, dry_run: bool) -> None:
+    """Backfill cursor refs from `[CP cursor: ...]` markers in commit messages."""
+    root = repo_root()
+    cfg = load_config(root, config)
+    branches = list(cfg['branches'])
+    changed = 0
+    for a in branches:
+        if not rev_parse(root, a):
+            continue
+        for b in branches:
+            if a == b or not rev_parse(root, b):
+                continue
+            commits = log(root, f'{git("merge-base", a, b, root=root).strip()}..{a}', files=False)
+            m = read_marker(commits, b, cfg['branches'].get(b) or {})
+            if not m:
+                continue
+            full = rev_parse(root, m[1])
+            if not full or not is_ancestor(root, full, b):
+                continue
+            old = rev_parse(root, cursor_ref(a, b))
+            if old == full or (old and is_ancestor(root, full, old)):
+                continue
+            print(f'{a} → {b}: {old[:9] if old else "—"} → {full[:9]}  (marker on {m[0].short})')
+            changed += 1
+            if not dry_run:
+                git('update-ref', cursor_ref(a, b), full, root=root)
+    print(f'{changed} cursor(s) {"would be " if dry_run else ""}updated')
+
+
+if __name__ == '__main__':
+    cli()
