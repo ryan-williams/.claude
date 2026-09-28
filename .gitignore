@@ -1,13 +1,18 @@
 settings.local.json
 
 # Claude Code runtime artifacts
+.last-cleanup
+.last-update-result.json
 backups/
 cache/
 chrome/
+daemon/
 debug/
+feedback/
 file-history/
 history.jsonl
 image-cache/
+jobs/
 mcp-needs-auth-cache.json
 paste-cache/
 plans/
@@ -15,15 +20,30 @@ plugins/
 projects/
 sessions/
 shell-snapshots/
+state/
 stats-cache.json
 statsig/
 tasks/
 telemetry/
 todos/
+uploads/
 usage-data/
+usage/
 
-# Auto-approve log (runtime)
+# Auto-approve log + its monthly archives (runtime; see bin/auto-approve-rotate)
 hooks/auto-approve.log
+hooks/archive/
+
+# Skills vendored from elsewhere, or synced down from the cloud — not authored here
+skills/synced/
+skills/agents-sdk/
+skills/cloudflare/
+skills/cloudflare-email-service/
+skills/durable-objects/
+skills/sandbox-sdk/
+skills/web-perf/
+skills/workers-best-practices/
+skills/wrangler/
 
 # Keybindings (user-specific)
 keybindings.json
