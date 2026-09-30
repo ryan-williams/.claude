@@ -20,7 +20,6 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus",
   "skillOverrides": {
     "ahs": "off",
     "agents-sdk": "off",
