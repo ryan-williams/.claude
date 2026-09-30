@@ -57,5 +57,10 @@
   "agentPushNotifEnabled": true,
   "feedbackSurveyState": {
     "lastShownTime": 1754000331023
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/bin/claude-statusline",
+    "padding": 0
   }
 }

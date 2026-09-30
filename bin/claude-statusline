@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Claude Code `statusLine` command. Receives the session's status JSON on stdin.
+#
+# Side effect: publishes the model to the enclosing tmux pane as the `@claude_model`
+# pane option, which `pane-border-format` in ~/.config/tmux/tmux.conf appends to the
+# pane title. Claude Code owns `pane_title` (via OSC title escapes), so a pane option
+# is the channel that doesn't get overwritten.
+#
+# Prints nothing, so Claude Code's own UI is unchanged.
+
+json=$(cat)
+[ -n "$TMUX_PANE" ] || exit 0
+model=$(jq -r '.model.display_name // .model.id // empty' <<<"$json")
+[ -n "$model" ] || exit 0
+cur=$(tmux show -pqv -t "$TMUX_PANE" @claude_model 2>/dev/null)
+[ "$cur" = "$model" ] || tmux set -p -t "$TMUX_PANE" @claude_model "$model"
