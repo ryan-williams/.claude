@@ -102,7 +102,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - OM / OoM = order of magnitude
 - SE = side effect
 - arch = architecture
-- ogi = `og:image`
+- ftfs = for the foreseeable future
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
   - LS / SS = `localStorage` / `sessionStorage`, PLS / PSS = persist in `{local,session}Storage`
