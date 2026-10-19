@@ -3,229 +3,534 @@
 # requires-python = ">=3.11"
 # dependencies = ["click"]
 # ///
-"""Inspect and advance `/read` cursors between local Claude sessions.
+"""Inspect, extract, and advance `/read` cursors across Claude and Codex.
 
-Cursor file (`~/.claude/state/read-cursors.json`) is keyed reader → target:
+The shared cursor file (`~/.agents/state/read-cursors.json`) is keyed by
+namespaced reader and target IDs. For example:
 
-    {"<reader_uuid>": {"<target_uuid>": {"last_line": int, "last_timestamp": str, "last_read_at": str}}}
+    {"codex:<uuid>": {"claude:<uuid>": {"last_line": 42, ...}}}
 
-It is *symmetric*: `[target][reader]` is the target's cursor over us, written by
-their `/read`. So `status` can answer "whose turn is it?" — how much of their
-history we haven't read, vs. how much of ours they haven't.
-
-    read-cursor status ctbk          # report both directions + a verdict
-    read-cursor advance ctbk         # cursor := target's current EOF
+Legacy Claude-only cursor data is read and migrated in memory. The legacy file
+is left untouched; the migrated form is written to the shared file the next
+time `advance` runs.
 """
 
 import json
+import os
 import re
+import sqlite3
 import sys
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from click import argument, group, option
 
 err = partial(print, file=sys.stderr)
 
-PROJECTS = Path.home() / '.claude' / 'projects'
-CURSORS = Path.home() / '.claude' / 'state' / 'read-cursors.json'
-# User messages that are local-command plumbing, not the human talking.
+CLAUDE_PROJECTS = Path.home() / '.claude' / 'projects'
+CODEX_HOME = Path(os.environ.get('CODEX_HOME', Path.home() / '.codex'))
+CODEX_STATE = CODEX_HOME / 'state_5.sqlite'
+CURSORS = Path.home() / '.agents' / 'state' / 'read-cursors.json'
+LEGACY_CURSORS = Path.home() / '.claude' / 'state' / 'read-cursors.json'
+AGENTS = ('claude', 'codex')
 PLUMBING = ('<local-command-', '<command-name>', '<command-message>', '<command-args>')
-# A bare slash-command (`/compact`) is a local action; one with args (`/read ctbk, ...`) is a prompt.
+SYNTHETIC_CLAUDE_TAGS = ('task-notification', 'system-reminder', 'ide_opened_file', 'ide_selection')
 BARE_COMMAND = re.compile(r'/[a-zA-Z][\w-]*\s*\Z')
+MAX_TOOL_INPUT = 8000
+
+
+@dataclass(frozen=True)
+class Session:
+    agent: str
+    uuid: str
+    path: Path
+    cwd: str
+    updated: float
+    title: str = ''
+
+    @property
+    def key(self) -> str:
+        return f'{self.agent}:{self.uuid}'
 
 
 def now() -> str:
     return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
-def sessions() -> dict[str, Path]:
-    """Map session UUID → jsonl path, across all projects."""
-    return {p.stem: p for p in PROJECTS.glob('*/*.jsonl')}
-
-
-def resolve(ref: str) -> tuple[str, Path]:
-    """Resolve a UUID (or prefix), or a project-dir substring, to (uuid, path).
-
-    A project-dir match picks that project's most-recently-modified session.
-    """
-    if ref is None:
-        raise SystemExit('no session ref given (and $CLAUDE_CODE_SESSION_ID unset)')
-    all_sessions = sessions()
-    if ref in all_sessions:
-        return ref, all_sessions[ref]
-    uuids = [u for u in all_sessions if u.startswith(ref)]
-    if len(uuids) == 1:
-        return uuids[0], all_sessions[uuids[0]]
-    if len(uuids) > 1:
-        raise SystemExit(f'ambiguous session prefix {ref!r}: {sorted(uuids)}')
-    dirs = [d for d in PROJECTS.iterdir() if d.is_dir() and ref.lower() in d.name.lower()]
-    if not dirs:
-        raise SystemExit(f'no session or project matching {ref!r}')
-    if len(dirs) > 1:
-        raise SystemExit(f'ambiguous project ref {ref!r}: {sorted(d.name for d in dirs)}')
-    jsonls = sorted(dirs[0].glob('*.jsonl'), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not jsonls:
-        raise SystemExit(f'project {dirs[0].name} has no sessions')
-    return jsonls[0].stem, jsonls[0]
-
-
-def project(path: Path) -> str:
-    """Human-readable project name from the encoded project dir.
-
-    Lossy in general (encoding drops `.`), but good enough to identify a repo.
-    """
-    decoded = '/' + path.parent.name.lstrip('-').replace('-', '/')
+def shorten(path: str) -> str:
     home = str(Path.home())
-    return '~' + decoded[len(home):] if decoded.startswith(home) else decoded
+    return '~' + path[len(home):] if path.startswith(home) else path
 
 
-def count_lines(path: Path) -> int:
-    n = 0
-    tail = b'\n'
-    with path.open('rb') as f:
-        while chunk := f.read(1 << 22):
-            n += chunk.count(b'\n')
-            tail = chunk[-1:]
-    return n if tail == b'\n' else n + 1
+def read_json_line(line: str) -> dict | None:
+    try:
+        value = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
 
 
-def tail_timestamp(path: Path, window: int = 1 << 20) -> str | None:
-    """Most recent `timestamp` in the file, scanning back from EOF."""
-    size = path.stat().st_size
-    with path.open('rb') as f:
-        f.seek(max(0, size - window))
-        data = f.read()
-    for line in reversed(data.split(b'\n')):
-        try:
-            d = json.loads(line)
-        except Exception:
+def claude_metadata(path: Path) -> tuple[str, str]:
+    uuid = path.stem
+    cwd = ''
+    with path.open(encoding='utf-8', errors='replace') as file:
+        for _, line in zip(range(100), file):
+            if not (event := read_json_line(line)):
+                continue
+            # The filename is the session id; a resumed/continued transcript's
+            # first events can carry the *previous* session's `sessionId`.
+            cwd = event.get('cwd') or cwd
+            if cwd:
+                break
+    project_cwd = '/' + path.parent.name.lstrip('-').replace('-', '/')
+    encoded_cwd = re.sub(r'[^a-zA-Z0-9]', '-', cwd) if cwd else ''
+    return uuid, cwd if encoded_cwd == path.parent.name else project_cwd
+
+
+def claude_sessions() -> list[Session]:
+    found = []
+    if not CLAUDE_PROJECTS.exists():
+        return found
+    for path in CLAUDE_PROJECTS.glob('*/*.jsonl'):
+        uuid, cwd = claude_metadata(path)
+        found.append(Session('claude', uuid, path, cwd, path.stat().st_mtime))
+    return found
+
+
+def codex_sessions_from_db() -> list[Session]:
+    if not CODEX_STATE.exists():
+        return []
+    uri = f'file:{CODEX_STATE}?mode=ro'
+    with sqlite3.connect(uri, uri=True) as db:
+        rows = db.execute(
+            """SELECT id, rollout_path, cwd,
+                      COALESCE(updated_at_ms, updated_at * 1000),
+                      COALESCE(NULLIF(name, ''), title, '')
+               FROM threads"""
+        ).fetchall()
+    found = []
+    for uuid, rollout_path, cwd, updated_ms, title in rows:
+        path = Path(rollout_path)
+        if not path.is_absolute():
+            path = CODEX_HOME / path
+        if path.exists():
+            found.append(Session('codex', uuid, path, cwd, updated_ms / 1000, title))
+    return found
+
+
+def codex_metadata(path: Path) -> tuple[str, str]:
+    with path.open(encoding='utf-8', errors='replace') as file:
+        for _, line in zip(range(100), file):
+            if not (event := read_json_line(line)):
+                continue
+            if event.get('type') != 'session_meta':
+                continue
+            payload = event.get('payload') or {}
+            return payload.get('id') or payload.get('session_id') or path.stem, payload.get('cwd') or ''
+    return path.stem, ''
+
+
+def codex_sessions_from_files() -> list[Session]:
+    paths = list((CODEX_HOME / 'sessions').glob('**/*.jsonl'))
+    paths.extend((CODEX_HOME / 'archived_sessions').glob('**/*.jsonl'))
+    found = []
+    for path in paths:
+        uuid, cwd = codex_metadata(path)
+        found.append(Session('codex', uuid, path, cwd, path.stat().st_mtime))
+    return found
+
+
+def codex_sessions() -> list[Session]:
+    """Prefer indexed Codex metadata; file scanning is a legitimate fallback."""
+    try:
+        indexed = codex_sessions_from_db()
+    except sqlite3.Error:
+        indexed = []
+    return indexed or codex_sessions_from_files()
+
+
+def sessions() -> dict[str, Session]:
+    return {session.key: session for session in claude_sessions() + codex_sessions()}
+
+
+def split_ref(ref: str) -> tuple[str | None, str]:
+    agent, separator, value = ref.partition(':')
+    return (agent, value) if separator and agent in AGENTS else (None, ref)
+
+
+def resolve(
+    ref: str,
+    catalog: dict[str, Session] | None = None,
+) -> Session:
+    """Resolve a namespaced/raw UUID or a source-qualified project substring."""
+    if not ref:
+        raise SystemExit('no session ref given')
+    catalog = catalog or sessions()
+    agent, value = split_ref(ref)
+    candidates = [session for session in catalog.values() if agent is None or session.agent == agent]
+
+    exact = [session for session in candidates if session.uuid == value or session.key == ref]
+    if len(exact) == 1:
+        return exact[0]
+
+    prefixes = [session for session in candidates if session.uuid.startswith(value)]
+    if len(prefixes) == 1:
+        return prefixes[0]
+    if len(prefixes) > 1:
+        matches = sorted(session.key for session in prefixes)
+        raise SystemExit(f'ambiguous session prefix {ref!r}: {matches}')
+
+    needle = value.casefold()
+    matches = [
+        session for session in candidates
+        if needle in session.cwd.casefold()
+        or needle in session.path.parent.name.casefold()
+        or needle in session.title.casefold()
+    ]
+    if not matches:
+        raise SystemExit(f'no session or project matching {ref!r}')
+    projects = sorted({session.cwd for session in matches})
+    if len(projects) > 1:
+        rendered = [shorten(project) for project in projects]
+        raise SystemExit(f'ambiguous project ref {ref!r}: {rendered}')
+    return max(matches, key=lambda session: session.updated)
+
+
+def qualify_legacy(key: str) -> str:
+    agent, separator, _ = key.partition(':')
+    return key if separator and agent in AGENTS else f'claude:{key}'
+
+
+def migrate_cursors(cursors: dict) -> dict:
+    migrated = {}
+    for reader, targets in cursors.items():
+        if not isinstance(targets, dict):
             continue
-        if ts := d.get('timestamp'):
-            return ts
-    return None
-
-
-def substantive(d: dict) -> bool:
-    """True for a human message or an assistant message with prose.
-
-    Excludes tool results, compaction summaries, and local-command plumbing —
-    the lines that inflate a raw unread count without carrying any new ask.
-    """
-    if d.get('isCompactSummary'):
-        return False
-    typ = d.get('type')
-    if typ not in ('user', 'assistant'):
-        return False
-    msg = d.get('message')
-    if not isinstance(msg, dict):
-        return False
-    content = msg.get('content')
-    if isinstance(content, str):
-        texts = [content]
-    elif isinstance(content, list):
-        texts = [b['text'] for b in content if isinstance(b, dict) and b.get('type') == 'text']
-    else:
-        return False
-    texts = [t for t in texts if t.strip()]
-    if not texts:
-        return False
-    if typ == 'user':
-        stripped = [t.strip() for t in texts]
-        if all(t.startswith(PLUMBING) or BARE_COMMAND.fullmatch(t) for t in stripped):
-            return False
-    return True
-
-
-def unread(path: Path, after: int) -> dict:
-    """Scan lines past `after`, counting total / substantive / by-role."""
-    total = users = assistants = 0
-    last_ts = None
-    with path.open(encoding='utf-8', errors='replace') as f:
-        for i, line in enumerate(f, 1):
-            if i <= after:
-                continue
-            total += 1
-            try:
-                d = json.loads(line)
-            except Exception:
-                continue
-            if ts := d.get('timestamp'):
-                last_ts = ts
-            if not substantive(d):
-                continue
-            if d['type'] == 'user':
-                users += 1
-            else:
-                assistants += 1
-    return dict(lines=total, msgs=users + assistants, users=users, assistants=assistants, newest_timestamp=last_ts)
+        migrated[qualify_legacy(reader)] = {
+            qualify_legacy(target): cursor
+            for target, cursor in targets.items()
+            if isinstance(cursor, dict)
+        }
+    return migrated
 
 
 def load_cursors() -> dict:
-    if not CURSORS.exists():
-        return {}
-    return json.loads(CURSORS.read_text())
+    if CURSORS.exists():
+        return json.loads(CURSORS.read_text())
+    if LEGACY_CURSORS.exists():
+        return migrate_cursors(json.loads(LEGACY_CURSORS.read_text()))
+    return {}
+
+
+def save_cursors(cursors: dict) -> None:
+    CURSORS.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile('w', dir=CURSORS.parent, delete=False) as file:
+        json.dump(cursors, file, indent=2, sort_keys=True)
+        file.write('\n')
+        temporary = Path(file.name)
+    temporary.replace(CURSORS)
+
+
+def detect_reader(
+    ref: str | None,
+    catalog: dict[str, Session],
+) -> Session:
+    if ref:
+        return resolve(ref, catalog)
+    environment = [
+        ('claude', os.environ.get('CLAUDE_CODE_SESSION_ID')),
+        ('codex', os.environ.get('CODEX_SESSION_ID') or os.environ.get('CODEX_THREAD_ID')),
+    ]
+    present = [(agent, uuid) for agent, uuid in environment if uuid]
+    if not present:
+        raise SystemExit('no reader given and no Claude/Codex session ID found in the environment')
+    if len(present) > 1:
+        rendered = [f'{agent}:{uuid}' for agent, uuid in present]
+        raise SystemExit(f'multiple reader session IDs found; pass --reader: {rendered}')
+    agent, uuid = present[0]
+    return resolve(f'{agent}:{uuid}', catalog)
 
 
 def last_target(cursors: dict, reader: str) -> str | None:
-    """The target `reader` read most recently — the no-arg default for both commands.
-
-    Every `advance` stamps `last_read_at`, so the reader's own cursor map already
-    records which session this one has been going back and forth with.
-    """
-    # One legacy entry is a bare cursor dict rather than a target map — skip non-dicts.
-    mine = {t: c for t, c in cursors.get(reader, {}).items()
-            if isinstance(c, dict) and c.get('last_read_at')}
-    if not mine:
-        return None
-    return max(mine, key=lambda t: mine[t]['last_read_at'])
+    mine = {
+        target: cursor
+        for target, cursor in cursors.get(reader, {}).items()
+        if isinstance(cursor, dict) and cursor.get('last_read_at')
+    }
+    return max(mine, key=lambda target: mine[target]['last_read_at']) if mine else None
 
 
-def resolve_target(cursors: dict, reader: str, target: str | None) -> tuple[str, Path]:
-    """Resolve TARGET, defaulting to the last session this reader read."""
+def resolve_target(
+    cursors: dict,
+    reader: Session,
+    target: str | None,
+    catalog: dict[str, Session],
+) -> Session:
     if target:
-        return resolve(target)
-    if not (last := last_target(cursors, reader)):
-        raise SystemExit('no TARGET given and no previous read recorded for this session')
-    uuid, path = resolve(last)
-    err(f'target: {uuid[:8]} ({project(path)}) — last read by this session')
-    return uuid, path
+        return resolve(target, catalog)
+    # An other-agent peer in this cwd (e.g. Codex beside Claude) with unread lines comes first: otherwise the
+    # last-read target would win every time and that peer would never be read without naming it.
+    mine = cursors.get(reader.key, {})
+    fresh = [
+        session for session in catalog.values()
+        if session.key != reader.key and session.cwd == reader.cwd and session.agent != reader.agent
+        and count_lines(session.path) > (mine.get(session.key) or {}).get('last_line', 0)
+    ]
+    if fresh:
+        session = max(fresh, key=lambda candidate: candidate.updated)
+        err(f'target: {session.key} ({shorten(session.cwd)}) — other-agent session in this cwd with unread lines')
+        return session
+    if last := last_target(cursors, reader.key):
+        if last in catalog and last != reader.key:
+            session = catalog[last]
+            err(f'target: {session.key} ({shorten(session.cwd)}) — last read by this session')
+            return session
+    same_cwd = [
+        session for session in catalog.values()
+        if session.key != reader.key and session.cwd == reader.cwd
+    ]
+    other_agent = [session for session in same_cwd if session.agent != reader.agent]
+    candidates = other_agent or same_cwd
+    if not candidates:
+        raise SystemExit('no TARGET given, no previous read recorded, and no peer session has this cwd')
+    session = max(candidates, key=lambda candidate: candidate.updated)
+    reason = 'newest other-agent session in this cwd' if other_agent else 'newest peer session in this cwd'
+    err(f'target: {session.key} ({shorten(session.cwd)}) — {reason}')
+    return session
 
 
-def side(cursors: dict, reader: str, target: str, target_path: Path) -> dict:
-    """What `reader` has yet to read of `target`."""
-    cur = cursors.get(reader, {}).get(target, {})
-    last_line = cur.get('last_line', 0)
-    return dict(
-        cursor_line=last_line,
-        last_read_at=cur.get('last_read_at'),
-        last_timestamp=cur.get('last_timestamp'),
-        **unread(target_path, last_line),
+def count_lines(path: Path) -> int:
+    count = 0
+    tail = b'\n'
+    with path.open('rb') as file:
+        while chunk := file.read(1 << 22):
+            count += chunk.count(b'\n')
+            tail = chunk[-1:]
+    return count if tail == b'\n' else count + 1
+
+
+def tail_timestamp(path: Path, window: int = 1 << 20) -> str | None:
+    size = path.stat().st_size
+    with path.open('rb') as file:
+        file.seek(max(0, size - window))
+        data = file.read()
+    for line in reversed(data.split(b'\n')):
+        if event := read_json_line(line.decode(errors='replace')):
+            if timestamp := event.get('timestamp'):
+                return timestamp
+    return None
+
+
+def text_content(content: object) -> list[str]:
+    if isinstance(content, str):
+        return [content] if content.strip() else []
+    if not isinstance(content, list):
+        return []
+    texts = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get('type') in ('text', 'input_text', 'output_text'):
+            if isinstance(text := block.get('text'), str) and text.strip():
+                texts.append(text)
+    return texts
+
+
+def synthetic_claude_text(text: str) -> bool:
+    stripped = text.strip()
+    return any(
+        stripped.startswith(f'<{tag}>') and stripped.endswith(f'</{tag}>')
+        for tag in SYNTHETIC_CLAUDE_TAGS
     )
 
 
+def tool_input(value: object) -> str:
+    rendered = value if isinstance(value, str) else json.dumps(value, sort_keys=True, ensure_ascii=False)
+    if len(rendered) <= MAX_TOOL_INPUT:
+        return rendered
+    omitted = len(rendered) - MAX_TOOL_INPUT
+    return f'{rendered[:MAX_TOOL_INPUT]}\n… <{omitted} characters omitted>'
+
+
+def normalized_event(
+    session: Session,
+    line: int,
+    timestamp: str | None,
+    kind: str,
+    text: str,
+    **extra,
+) -> dict:
+    return {
+        'source': session.agent,
+        'session': session.key,
+        'line': line,
+        'timestamp': timestamp,
+        'kind': kind,
+        'text': text,
+        **extra,
+    }
+
+
+def normalize_claude(session: Session, line: int, event: dict) -> list[dict]:
+    timestamp = event.get('timestamp')
+    message = event.get('message')
+    if not isinstance(message, dict):
+        return []
+    texts = text_content(message.get('content'))
+    if event.get('isCompactSummary'):
+        return [normalized_event(session, line, timestamp, 'summary', text) for text in texts]
+    role = event.get('type')
+    if role not in ('user', 'assistant'):
+        return []
+    if role == 'user':
+        stripped = [text.strip() for text in texts]
+        if stripped and all(
+            text.startswith(PLUMBING)
+            or BARE_COMMAND.fullmatch(text)
+            or synthetic_claude_text(text)
+            for text in stripped
+        ):
+            return []
+    normalized = [normalized_event(session, line, timestamp, role, text) for text in texts]
+    if role == 'assistant' and isinstance(content := message.get('content'), list):
+        for block in content:
+            if not isinstance(block, dict) or block.get('type') != 'tool_use':
+                continue
+            normalized.append(normalized_event(
+                session,
+                line,
+                timestamp,
+                'tool',
+                tool_input(block.get('input')),
+                name=block.get('name'),
+            ))
+    return normalized
+
+
+def normalize_codex(session: Session, line: int, event: dict) -> list[dict]:
+    timestamp = event.get('timestamp')
+    event_type = event.get('type')
+    payload = event.get('payload')
+    if not isinstance(payload, dict):
+        return []
+    if event_type == 'compacted':
+        retained = payload.get('retained_context') or {}
+        messages = []
+        for role, field in (('user', 'user_messages'), ('assistant', 'assistant_messages')):
+            for message in retained.get(field, []):
+                if isinstance(message, dict) and isinstance(message.get('text'), str):
+                    messages.append((message.get('order', 0), role, message['text']))
+        return [
+            normalized_event(session, line, timestamp, role, text, compacted=True)
+            for _, role, text in sorted(messages, key=lambda item: item[0])
+        ]
+    if event_type != 'response_item':
+        return []
+    payload_type = payload.get('type')
+    if payload_type == 'message' and payload.get('role') in ('user', 'assistant'):
+        role = payload['role']
+        return [
+            normalized_event(session, line, timestamp, role, text)
+            for text in text_content(payload.get('content'))
+        ]
+    if payload_type in ('custom_tool_call', 'function_call'):
+        return [normalized_event(
+            session,
+            line,
+            timestamp,
+            'tool',
+            tool_input(payload.get('input') or payload.get('arguments') or ''),
+            name=payload.get('name'),
+        )]
+    return []
+
+
+def normalize(session: Session, line: int, event: dict) -> list[dict]:
+    return normalize_claude(session, line, event) if session.agent == 'claude' else normalize_codex(session, line, event)
+
+
+def first_read_after(session: Session) -> int:
+    latest = 0
+    with session.path.open(encoding='utf-8', errors='replace') as file:
+        for line_number, line in enumerate(file, 1):
+            if not (event := read_json_line(line)):
+                continue
+            if session.agent == 'claude' and event.get('isCompactSummary'):
+                latest = line_number
+            if session.agent == 'codex' and event.get('type') == 'compacted':
+                latest = line_number
+    return latest - 1 if latest else 0
+
+
+def events_after(session: Session, after: int) -> list[dict]:
+    events = []
+    with session.path.open(encoding='utf-8', errors='replace') as file:
+        for line_number, line in enumerate(file, 1):
+            if line_number <= after:
+                continue
+            if event := read_json_line(line):
+                events.extend(normalize(session, line_number, event))
+    return events
+
+
+def unread(session: Session, after: int) -> dict:
+    events = events_after(session, after)
+    users = sum(event['kind'] == 'user' for event in events)
+    assistants = sum(event['kind'] == 'assistant' for event in events)
+    return {
+        'lines': count_lines(session.path) - after,
+        'msgs': users + assistants,
+        'users': users,
+        'assistants': assistants,
+        'newest_timestamp': tail_timestamp(session.path),
+    }
+
+
+def side(cursors: dict, reader: str, target: Session) -> dict:
+    cursor = cursors.get(reader, {}).get(target.key, {})
+    last_line = cursor.get('last_line', 0)
+    return {
+        'cursor_line': last_line,
+        'last_read_at': cursor.get('last_read_at'),
+        'last_timestamp': cursor.get('last_timestamp'),
+        **unread(target, last_line),
+    }
+
+
+def context(
+    reader_ref: str | None,
+    target_ref: str | None,
+) -> tuple[Session, Session, dict]:
+    catalog = sessions()
+    cursors = load_cursors()
+    reader = detect_reader(reader_ref, catalog)
+    target = resolve_target(cursors, reader, target_ref, catalog)
+    if reader.key == target.key:
+        raise SystemExit('reader and target are the same session')
+    return reader, target, cursors
+
+
 @group
-def cli():
-    """Inspect and advance `/read` cursors between local Claude sessions."""
+def cli() -> None:
+    """Inspect and advance `/read` cursors across Claude and Codex sessions."""
 
 
 @cli.command
-@option('-j', '--json', 'as_json', is_flag=True, help="Emit the report as JSON")
-@option('-r', '--reader', envvar='CLAUDE_CODE_SESSION_ID', help="Reading session (default: $CLAUDE_CODE_SESSION_ID)")
+@option('-j', '--json', 'as_json', is_flag=True, help='Emit the report as JSON')
+@option('-r', '--reader', help='Reading session (default: detect Claude/Codex environment)')
 @argument('target', required=False)
-def status(as_json: bool, reader: str, target: str | None):
-    """Report both read directions between READER and TARGET, and whose turn it is.
-
-    With no TARGET, uses the session this one read most recently.
-    """
-    reader, reader_path = resolve(reader)
-    cursors = load_cursors()
-    target, target_path = resolve_target(cursors, reader, target)
-    if reader == target:
-        raise SystemExit('reader and target are the same session')
-    ours = side(cursors, reader, target, target_path)
-    theirs = side(cursors, target, reader, reader_path)
+def status(
+    as_json: bool,
+    reader: str | None,
+    target: str | None,
+) -> None:
+    """Report both read directions between READER and TARGET."""
+    reader_session, target_session, cursors = context(reader, target)
+    ours = side(cursors, reader_session.key, target_session)
+    theirs = side(cursors, target_session.key, reader_session)
 
     if ours['msgs'] and not theirs['msgs']:
         turn, why = 'US', f"{ours['msgs']} unread messages from them; they are caught up"
@@ -236,55 +541,90 @@ def status(as_json: bool, reader: str, target: str | None):
     else:
         turn, why = 'IN SYNC', 'neither side has unread messages'
 
-    report = dict(
-        now=now(),
-        turn=turn,
-        why=why,
-        reader=dict(session=reader, project=project(reader_path), lines=count_lines(reader_path), last_event=tail_timestamp(reader_path)),
-        target=dict(session=target, project=project(target_path), lines=count_lines(target_path), last_event=tail_timestamp(target_path)),
-        we_read_them=ours,
-        they_read_us=theirs,
-    )
+    report = {
+        'now': now(),
+        'turn': turn,
+        'why': why,
+        'reader': {
+            **asdict(reader_session),
+            'path': str(reader_session.path),
+            'session': reader_session.key,
+            'project': shorten(reader_session.cwd),
+            'lines': count_lines(reader_session.path),
+            'last_event': tail_timestamp(reader_session.path),
+        },
+        'target': {
+            **asdict(target_session),
+            'path': str(target_session.path),
+            'session': target_session.key,
+            'project': shorten(target_session.cwd),
+            'lines': count_lines(target_session.path),
+            'last_event': tail_timestamp(target_session.path),
+        },
+        'we_read_them': ours,
+        'they_read_us': theirs,
+    }
     if as_json:
         print(json.dumps(report, indent=2, sort_keys=True))
         return
 
     for role in ('reader', 'target'):
-        r = report[role]
-        print(f"{role:7} {r['session'][:8]}  {r['project']:24} {r['lines']:>8} lines  last event {r['last_event']}")
+        item = report[role]
+        print(f"{role:7} {item['session']:43} {item['project']}  {item['lines']} lines  last event {item['last_event']}")
     print()
-    for label, s in (('we→them', ours), ('them→us', theirs)):
-        read_at = s['last_read_at'] or 'never'
-        print(f"{label}  cursor @ {s['cursor_line']:>8} (read {read_at})  unread: {s['lines']} lines, {s['msgs']} msgs ({s['users']}u/{s['assistants']}a)")
+    for label, item in (('we→them', ours), ('them→us', theirs)):
+        read_at = item['last_read_at'] or 'never'
+        print(f"{label}  cursor @ {item['cursor_line']} (read {read_at})  unread: {item['lines']} lines, {item['msgs']} msgs ({item['users']}u/{item['assistants']}a)")
     print()
-    print(f"turn: {turn} — {why}")
+    print(f'turn: {turn} — {why}')
     print(f"now:  {report['now']}")
+
+
+@cli.command(name='read')
+@option('-o', '--output', type=Path, help='Write normalized JSONL to this path')
+@option('-r', '--reader', help='Reading session (default: detect Claude/Codex environment)')
+@argument('target', required=False)
+def read_events(
+    output: Path | None,
+    reader: str | None,
+    target: str | None,
+) -> None:
+    """Extract TARGET's unread transcript as source-neutral JSONL."""
+    reader_session, target_session, cursors = context(reader, target)
+    cursor = cursors.get(reader_session.key, {}).get(target_session.key)
+    after = cursor.get('last_line', 0) if cursor else first_read_after(target_session)
+    events = events_after(target_session, after)
+    rendered = ''.join(json.dumps(event, ensure_ascii=False, sort_keys=True) + '\n' for event in events)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered)
+    else:
+        print(rendered, end='')
+    destination = str(output) if output else 'stdout'
+    err(f'{target_session.key}: {len(events)} normalized events from lines {after + 1}-{count_lines(target_session.path)} → {destination}')
 
 
 @cli.command
 @option('-l', '--line', type=int, help="Cursor line (default: TARGET's current line count)")
-@option('-r', '--reader', envvar='CLAUDE_CODE_SESSION_ID', help="Reading session (default: $CLAUDE_CODE_SESSION_ID)")
+@option('-r', '--reader', help='Reading session (default: detect Claude/Codex environment)')
 @option('-t', '--timestamp', help="Last-read event timestamp (default: TARGET's last event)")
 @argument('target', required=False)
-def advance(line: int, reader: str, timestamp: str, target: str | None):
-    """Advance READER's cursor over TARGET to TARGET's current EOF.
-
-    With no TARGET, advances over the session this one read most recently.
-    """
-    reader, _ = resolve(reader)
-    cursors = load_cursors()
-    target, target_path = resolve_target(cursors, reader, target)
-    if reader == target:
-        raise SystemExit('reader and target are the same session')
+def advance(
+    line: int | None,
+    reader: str | None,
+    timestamp: str | None,
+    target: str | None,
+) -> None:
+    """Advance READER's cursor over TARGET to TARGET's current EOF."""
+    reader_session, target_session, cursors = context(reader, target)
     if line is None:
-        line = count_lines(target_path)
+        line = count_lines(target_session.path)
     if timestamp is None:
-        timestamp = tail_timestamp(target_path)
-    entry = dict(last_line=line, last_read_at=now(), last_timestamp=timestamp)
-    cursors.setdefault(reader, {})[target] = entry
-    CURSORS.parent.mkdir(parents=True, exist_ok=True)
-    CURSORS.write_text(json.dumps(cursors, indent=2, sort_keys=True) + '\n')
-    err(f"{reader[:8]} → {target[:8]}: line {line}, last event {timestamp}, read at {entry['last_read_at']}")
+        timestamp = tail_timestamp(target_session.path)
+    entry = {'last_line': line, 'last_read_at': now(), 'last_timestamp': timestamp}
+    cursors.setdefault(reader_session.key, {})[target_session.key] = entry
+    save_cursors(cursors)
+    err(f"{reader_session.key} → {target_session.key}: line {line}, last event {timestamp}, read at {entry['last_read_at']}")
 
 
 if __name__ == '__main__':
