@@ -63,7 +63,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - HLB = "headless browser", HFB = "headful browser", HB = either (context-dependent, but probably headless), PW = PlayWright (usual HLB library of choice), PPTR = Puppeteer (another HLB library)
 - SFs = significant figures / sig-figs
 - sg = sounds good, ga = go ahead
-- EB = exponential backoff
+- EB = exp-bak = exponential backoff, exp-inc = exponential increase (esp. in an algorithm/parameter-sweep context, exp-sweep could go in both directions).
 - BTS = behind the scenes
 - desc = description
 - CIC = check in chrome; use the MCP integration and verify the UI/UX being discussed, in a live browser
@@ -102,7 +102,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - OM / OoM = order of magnitude
 - SE = side effect
 - arch = architecture
-- ftfs = for the foreseeable future
+- ftff = for the foreseeable future
 - In JS / web projects:
   - FE / BE = Frontend / Backend, BB = Bounding Box
   - LS / SS = `localStorage` / `sessionStorage`, PLS / PSS = persist in `{local,session}Storage`
@@ -159,7 +159,17 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - ys = yak shave
 - rh = rabbit hole
 - ph = placeholder
+- es = executive summary
 - 1p = 1st-party, 3p = 3rd-party
+- pe = pre-empt (as in VMs)
+- ev = env var
+- tk = turnkey
+- lhf = low-hanging fruit
+- lmk = let me know, but often i'll mean "let me know if you need anything from me", e.g. I'm coming back to a session, or not following that closely, and want to make sure you're not blocked and also that you are continuing to work on w/e we've recently discussed.
+- TOs = tradeoffs
+- SoT = Source of Truth
+- ootb = out of the box, ots = off the shelf
+- c10e = canonicalize = c'ize = c'ze, c14n = canonicalization = c'n
 - ML-related abbrevs: LF = loss function, LR = learning rate, SL = scaling law, RE = reconstruction loss/error (lossy-codec / autoencoder reconstruction quality), VV = VQ-VAE (vector-quantized variational autoencoder)
 - WR = with replacment, WOR = without replacement (i.e. when sampling from a distribution)
 
