@@ -34,8 +34,10 @@ One workflow I use involves the former session writing a "spec" `.md` file in a 
 Draft GitHub issues and PRs using `ghpr` (formerly [standalone](https://github.com/runsascoded/ghpr), now an alias for the `thrds github` group of [`thrds`](https://github.com/runsascoded/thrds), usually cloned at `$c/thrds`). It allows reviewing and submitting changes to issue/PR descriptions and comments, from "clones" in `gh/XXX` dirs. New issues/PRs can also be drafted in `gh/drafts/<slug>.md`, and be moved to `gh/XXX/` once "pushed" (filed/created).
 
 ## Acronyms / Shorthands
+
 I use these acronyms and abbreviations (generally case-insensitive):
 
+- cs3 = constant-size steady state
 - WT: Git worktree (often in the sense of "tracked dir with a Git object hash based on recursive hash of its tracked files", not just the `git worktree` subcommand)
 - UCs: Uncommitted Changes (staged and unstaged)
 - SCs: Staged Changes (Git index)
@@ -65,6 +67,7 @@ I use these acronyms and abbreviations (generally case-insensitive):
 - sg = sounds good, ga = go ahead
 - EB = exp-bak = exponential backoff, exp-inc = exponential increase (esp. in an algorithm/parameter-sweep context, exp-sweep could go in both directions).
 - BTS = behind the scenes
+- BSing = BrainStorming
 - desc = description
 - CIC = check in chrome; use the MCP integration and verify the UI/UX being discussed, in a live browser
 - SM = submodule (as in Git)
